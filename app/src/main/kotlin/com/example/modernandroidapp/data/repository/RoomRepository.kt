@@ -41,15 +41,6 @@ class RoomRepository(
     }
 
     /**
-     * Get materials with low stock as a reactive Flow
-     * Filters materials where quantity <= minStock
-     * @return Flow of list of low stock materials
-     */
-    override fun getLowStockMaterials(): Flow<List<ArtMaterial>> {
-        return artMaterialDao.getLowStockMaterials()
-    }
-
-    /**
      * Update quantity of a material by ID
      * Updates the in-database state and returns success/failure result
      *
@@ -89,9 +80,10 @@ class RoomRepository(
      * @param name Name of the material
      * @param brand Brand or manufacturer name (used as description)
      * @param quantity Initial quantity (must be > 0)
+     * @param category Category of the material
      * @return Result with the created ArtMaterial on success, Exception on failure
      */
-    override suspend fun addMaterial(name: String, brand: String, quantity: Int): Result<ArtMaterial> {
+    override suspend fun addMaterial(name: String, brand: String, quantity: Int, category: String): Result<ArtMaterial> {
         return try {
             // Validate inputs
             if (name.isBlank()) {
@@ -109,11 +101,10 @@ class RoomRepository(
                 id = newId,
                 name = name,
                 description = brand.ifBlank { "No brand specified" },
-                category = "Other", // Default category
+                category = category,
                 quantity = quantity,
                 unit = "unit", // Default unit
-                price = 0.0, // Default price (can be updated later)
-                minStock = 5 // Default min stock threshold
+                price = 0.0 // Default price (can be updated later)
             )
 
             // Insert into database

@@ -1,6 +1,15 @@
 package com.example.modernandroidapp.ui.screen
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,12 +26,16 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -48,33 +61,57 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.draw.alpha
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.graphics.graphicsLayer
 import com.example.modernandroidapp.data.repository.ArtMaterial
 import com.example.modernandroidapp.ui.viewmodel.InventoryViewModel
+import com.example.modernandroidapp.ui.theme.CategoryPaintColor
+import com.example.modernandroidapp.ui.theme.CategoryBrushesColor
+import com.example.modernandroidapp.ui.theme.CategoryCanvasColor
+import com.example.modernandroidapp.ui.theme.CategoryPaperColor
+import com.example.modernandroidapp.ui.theme.CategoryPencilsColor
+import com.example.modernandroidapp.ui.theme.CategoryMarkersColor
+import com.example.modernandroidapp.ui.theme.CategorySketchbooksColor
+import com.example.modernandroidapp.ui.theme.CategoryOtherColor
 
 /**
  * Main Inventory Screen
  * Displays a list of art materials with their details and stock status
+ * Includes search and category filtering
  */
 @Composable
 fun InventoryScreen(
     viewModel: InventoryViewModel
 ) {
     val materials by viewModel.allMaterials.collectAsState()
-    val lowStockCount = materials.count { viewModel.isLowStock(it) }
+    val filteredMaterials by viewModel.filteredMaterials.collectAsState()
+    val searchQuery by viewModel.searchQuery.collectAsState()
+    val selectedCategory by viewModel.selectedCategory.collectAsState()
+    val availableCategories by viewModel.availableCategories.collectAsState()
     var showAddMaterialDialog by remember { mutableStateOf(false) }
+    var fabPressed by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
             InventoryTopAppBar(
-                totalItems = materials.size,
-                lowStockCount = lowStockCount
+                totalItems = materials.size
             )
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { showAddMaterialDialog = true },
+                onClick = { 
+                    fabPressed = true
+                    showAddMaterialDialog = true
+                },
                 containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier.graphicsLayer {
+                    scaleX = if (fabPressed) 0.95f else 1f
+                    scaleY = if (fabPressed) 0.95f else 1f
+                }
             ) {
                 Icon(
                     imageVector = Icons.Filled.Add,
@@ -83,52 +120,167 @@ fun InventoryScreen(
             }
         }
     ) { paddingValues ->
-        if (materials.isEmpty()) {
-            EmptyInventoryState(modifier = Modifier.padding(paddingValues))
-        } else {
-            MaterialsList(
-                materials = materials,
-                viewModel = viewModel,
-                modifier = Modifier.padding(paddingValues)
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
+            // Search bar
+            SearchBar(
+                query = searchQuery,
+                onQueryChange = { viewModel.updateSearchQuery(it) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
             )
+
+            // Category filter chips
+            CategoryFilterRow(
+                categories = availableCategories,
+                selectedCategory = selectedCategory,
+                onCategorySelected = { viewModel.selectCategory(it) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            )
+
+            // Materials list
+            if (filteredMaterials.isEmpty()) {
+                if (materials.isEmpty()) {
+                    EmptyInventoryState(modifier = Modifier.weight(1f))
+                } else {
+                    EmptySearchState(modifier = Modifier.weight(1f))
+                }
+            } else {
+                MaterialsList(
+                    materials = filteredMaterials,
+                    viewModel = viewModel,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                )
+            }
         }
     }
 
     if (showAddMaterialDialog) {
         AddMaterialDialog(
-            onDismiss = { showAddMaterialDialog = false },
-            onAdd = { name, brand, quantity ->
+            categories = InventoryViewModel.FIXED_CATEGORIES,
+            onDismiss = { 
+                showAddMaterialDialog = false
+                fabPressed = false
+            },
+            onAdd = { name, brand, quantity, category ->
                 quantity.toIntOrNull()?.let { quantityInt ->
-                    viewModel.addMaterial(name, brand, quantityInt)
+                    viewModel.addMaterial(name, brand, quantityInt, category)
                 }
                 showAddMaterialDialog = false
+                fabPressed = false
             }
         )
     }
 }
 
 /**
+ * Search Bar
+ * Material 3 TextField for real-time search filtering
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SearchBar(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    OutlinedTextField(
+        value = query,
+        onValueChange = onQueryChange,
+        modifier = modifier,
+        placeholder = { Text("Search materials...") },
+        singleLine = true,
+        shape = RoundedCornerShape(16.dp)
+    )
+}
+
+/**
+ * Category Filter Row
+ * Row of FilterChips for category filtering with smooth selection animation
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CategoryFilterRow(
+    categories: List<String>,
+    selectedCategory: String,
+    onCategorySelected: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val allCategories = listOf("All") + categories
+    
+    // Function to get pastel color for category
+    fun getCategoryColor(category: String): Color = when (category) {
+        "Paint" -> CategoryPaintColor
+        "Brushes" -> CategoryBrushesColor
+        "Canvas" -> CategoryCanvasColor
+        "Paper" -> CategoryPaperColor
+        "Pencils" -> CategoryPencilsColor
+        "Markers" -> CategoryMarkersColor
+        "Sketchbooks" -> CategorySketchbooksColor
+        "All" -> Color(0xFFE8E8E8) // Light gray for "All"
+        else -> CategoryOtherColor
+    }
+
+    androidx.compose.foundation.lazy.LazyRow(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(0.dp)
+    ) {
+        items(allCategories) { category ->
+            AnimatedContent(
+                targetState = selectedCategory == category,
+                label = "filterChipAnimation"
+            ) { isSelected ->
+                FilterChip(
+                    selected = isSelected,
+                    onClick = { onCategorySelected(category) },
+                    label = { Text(category) },
+                    modifier = Modifier.graphicsLayer {
+                        scaleX = if (isSelected) 1.0f else 0.95f
+                        scaleY = if (isSelected) 1.0f else 0.95f
+                    },
+                    colors = FilterChipDefaults.filterChipColors(
+                        containerColor = getCategoryColor(category),
+                        labelColor = Color(0xFF3F3F3F),
+                        selectedContainerColor = MaterialTheme.colorScheme.primary,
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary
+                    )
+                )
+            }
+        }
+    }
+}
+
+/**
  * Top app bar for inventory screen
- * Shows title and summary of inventory status
+ * Shows title and total inventory count
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun InventoryTopAppBar(
-    totalItems: Int,
-    lowStockCount: Int
+    totalItems: Int
 ) {
     TopAppBar(
         title = {
             Column {
                 Text(
-                    text = "Craft Nook Inventory",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold
+                    text = "Craft Nook",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Medium,
+                    letterSpacing = 0.5.sp
                 )
                 Text(
-                    text = "$totalItems items • $lowStockCount low stock",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    text = "$totalItems materials",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f)
                 )
             }
         },
@@ -142,6 +294,7 @@ private fun InventoryTopAppBar(
 /**
  * Materials List
  * Displays all materials in a LazyColumn with proper spacing
+ * Includes staggered fade-in animations for smooth visual feedback
  */
 @Composable
 private fun MaterialsList(
@@ -151,80 +304,99 @@ private fun MaterialsList(
 ) {
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         items(
             items = materials,
             key = { material -> material.id }
         ) { material ->
-            InventoryItemCard(
-                material = material,
-                isLowStock = viewModel.isLowStock(material),
-                onEdit = { updatedMaterial -> viewModel.updateMaterial(updatedMaterial) },
-                onDelete = { viewModel.deleteMaterial(material.id) }
-            )
+            // Staggered fade-in animation for each item
+            AnimatedVisibility(
+                visible = true,
+                enter = fadeIn(
+                    animationSpec = tween(
+                        durationMillis = 400,
+                        easing = FastOutSlowInEasing
+                    )
+                ) + slideInVertically(
+                    animationSpec = tween(
+                        durationMillis = 400,
+                        easing = FastOutSlowInEasing
+                    ),
+                    initialOffsetY = { 40 }
+                )
+            ) {
+                InventoryItemCard(
+                    material = material,
+                    onEdit = { updatedMaterial -> viewModel.updateMaterial(updatedMaterial) },
+                    onDelete = { viewModel.deleteMaterial(material.id) }
+                )
+            }
         }
     }
 }
 
 /**
  * Inventory Item Card
- * Shows individual art material details with low stock indicator, edit and delete buttons
+ * Shows individual art material details with edit and delete buttons
+ * Includes scale and fade animations on button press
  *
- * Uses Material 3 Card component with conditional styling based on stock status
+ * Uses Material 3 Card component
  */
 @Composable
 private fun InventoryItemCard(
     material: ArtMaterial,
-    isLowStock: Boolean,
     onEdit: (ArtMaterial) -> Unit = {},
     onDelete: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var showDeleteConfirmation by remember { mutableStateOf(false) }
     var showEditDialog by remember { mutableStateOf(false) }
+    var editButtonPressed by remember { mutableStateOf(false) }
+    var deleteButtonPressed by remember { mutableStateOf(false) }
 
     Card(
         modifier = modifier
             .fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (isLowStock)
-                MaterialTheme.colorScheme.errorContainer
-            else
-                MaterialTheme.colorScheme.surfaceVariant
+            containerColor = MaterialTheme.colorScheme.surface
         ),
         elevation = CardDefaults.cardElevation(
             defaultElevation = 2.dp
-        )
+        ),
+        border = androidx.compose.material3.CardDefaults.outlinedCardBorder()
     ) {
         Column(
-            modifier = Modifier.padding(16.dp)
+            modifier = Modifier.padding(20.dp)
         ) {
-            // Header row with name and low stock indicator
+            // Header row with name
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Material Name
+                // Material Name - Now Bigger & More Prominent
                 Column(
                     modifier = Modifier.weight(1f)
                 ) {
                     Text(
                         text = material.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 2
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = material.description,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1
-                    )
+                    if (material.description.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = material.description,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1
+                        )
+                    }
                 }
 
                 // Action buttons row
@@ -232,11 +404,18 @@ private fun InventoryItemCard(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Edit button
+                    // Edit button with press animation
                     Button(
-                        onClick = { showEditDialog = true },
+                        onClick = { 
+                            editButtonPressed = true
+                            showEditDialog = true
+                        },
                         modifier = Modifier
-                            .size(36.dp),
+                            .size(36.dp)
+                            .graphicsLayer {
+                                scaleX = if (editButtonPressed) 0.95f else 1f
+                                scaleY = if (editButtonPressed) 0.95f else 1f
+                            },
                         shape = RoundedCornerShape(6.dp),
                         colors = androidx.compose.material3.ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.primary,
@@ -251,99 +430,81 @@ private fun InventoryItemCard(
                         )
                     }
 
-                    // Delete button
+                    // Delete button - Outlined version with subtle styling and press animation
                     Button(
-                        onClick = { showDeleteConfirmation = true },
+                        onClick = { 
+                            deleteButtonPressed = true
+                            showDeleteConfirmation = true
+                        },
                         modifier = Modifier
-                            .size(36.dp),
-                        shape = RoundedCornerShape(6.dp),
-                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.error,
-                            contentColor = MaterialTheme.colorScheme.onError
+                            .size(40.dp)
+                            .border(1.5.dp, Color(0xFFCBD5E0), RoundedCornerShape(8.dp))
+                            .graphicsLayer {
+                                scaleX = if (deleteButtonPressed) 0.95f else 1f
+                                scaleY = if (deleteButtonPressed) 0.95f else 1f
+                            },
+                        shape = RoundedCornerShape(8.dp),
+                        colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(
+                            contentColor = Color(0xFF718096)
                         ),
                         contentPadding = PaddingValues(0.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Filled.Delete,
+                            imageVector = Icons.Outlined.Delete,
                             contentDescription = "Delete material",
                             modifier = Modifier.size(20.dp)
                         )
-                    }
-
-                    // Low Stock Alert Icon
-                    if (isLowStock) {
-                        Box(
-                            modifier = Modifier
-                                .size(32.dp)
-                                .background(
-                                    color = MaterialTheme.colorScheme.error,
-                                    shape = RoundedCornerShape(8.dp)
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.Warning,
-                                contentDescription = "Low Stock Alert",
-                                tint = MaterialTheme.colorScheme.onError,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
                     }
                 }
             }
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Details row with category, quantity, and price
+            // Details row with category and quantity
             Row(
                 modifier = Modifier
                     .fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.Start,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Category Badge
+                // Category Badge with scale animation on hover
                 CategoryBadge(category = material.category)
 
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(12.dp))
 
                 // Quantity and Unit
                 QuantityInfo(
                     quantity = material.quantity,
                     unit = material.unit,
-                    minStock = material.minStock,
-                    isLowStock = isLowStock,
                     modifier = Modifier.weight(1f)
-                )
-
-                Spacer(modifier = Modifier.width(8.dp))
-
-                // Price
-                Text(
-                    text = "$${String.format("%.2f", material.price)}",
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
                 )
             }
         }
     }
 
-    // Edit dialog
+    // Edit dialog with fade and scale animation
     if (showEditDialog) {
         EditMaterialDialog(
             material = material,
-            onDismiss = { showEditDialog = false },
+            onDismiss = { 
+                showEditDialog = false
+                editButtonPressed = false
+            },
             onSave = { updatedMaterial ->
                 onEdit(updatedMaterial)
                 showEditDialog = false
+                editButtonPressed = false
             }
         )
     }
 
-    // Delete confirmation dialog
+    // Delete confirmation dialog with fade and scale animation
     if (showDeleteConfirmation) {
         AlertDialog(
-            onDismissRequest = { showDeleteConfirmation = false },
+            onDismissRequest = { 
+                showDeleteConfirmation = false
+                deleteButtonPressed = false
+            },
             title = {
                 Text("Delete Material")
             },
@@ -355,13 +516,17 @@ private fun InventoryItemCard(
                     onClick = {
                         onDelete()
                         showDeleteConfirmation = false
+                        deleteButtonPressed = false
                     }
                 ) {
                     Text("Delete")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteConfirmation = false }) {
+                TextButton(onClick = { 
+                    showDeleteConfirmation = false
+                    deleteButtonPressed = false
+                }) {
                     Text("Cancel")
                 }
             }
@@ -371,85 +536,80 @@ private fun InventoryItemCard(
 
 /**
  * Category Badge
- * Shows the category of the material in a styled chip
+ * Shows the category of the material in a styled chip with premium pastel colors
+ * Includes subtle scale animation on interaction
  */
 @Composable
 private fun CategoryBadge(
     category: String,
     modifier: Modifier = Modifier
 ) {
+    var isHovered by remember { mutableStateOf(false) }
+    
+    // Map categories to premium pastel colors
+    val backgroundColor = when (category) {
+        "Paint" -> CategoryPaintColor
+        "Brushes" -> CategoryBrushesColor
+        "Canvas" -> CategoryCanvasColor
+        "Paper" -> CategoryPaperColor
+        "Pencils" -> CategoryPencilsColor
+        "Markers" -> CategoryMarkersColor
+        "Sketchbooks" -> CategorySketchbooksColor
+        else -> CategoryOtherColor
+    }
+    
+    // Dark text for good contrast on pastels
+    val textColor = Color(0xFF2D3748)
+
     Box(
         modifier = modifier
             .background(
-                color = MaterialTheme.colorScheme.primaryContainer,
-                shape = RoundedCornerShape(8.dp)
+                color = backgroundColor,
+                shape = RoundedCornerShape(14.dp)
             )
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            .padding(horizontal = 14.dp, vertical = 10.dp)
+            .graphicsLayer {
+                scaleX = if (isHovered) 1.05f else 1f
+                scaleY = if (isHovered) 1.05f else 1f
+            },
         contentAlignment = Alignment.Center
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Filled.Category,
-                contentDescription = null,
-                modifier = Modifier.size(14.dp),
-                tint = MaterialTheme.colorScheme.onPrimaryContainer
-            )
-            Text(
-                text = category,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                fontWeight = FontWeight.Medium
-            )
-        }
+        Text(
+            text = category,
+            style = MaterialTheme.typography.labelSmall,
+            color = textColor,
+            fontWeight = FontWeight.Medium,
+            letterSpacing = 0.3.sp
+        )
     }
 }
 
 /**
  * Quantity Info
- * Displays stock quantity with visual indicator for low stock status
+ * Displays stock quantity with icon
  */
 @Composable
 private fun QuantityInfo(
     quantity: Int,
     unit: String,
-    minStock: Int,
-    isLowStock: Boolean,
     modifier: Modifier = Modifier
 ) {
-    Column(
-        modifier = modifier
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Filled.Inventory2,
-                contentDescription = null,
-                modifier = Modifier.size(16.dp),
-                tint = if (isLowStock)
-                    MaterialTheme.colorScheme.error
-                else
-                    MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                text = "$quantity $unit",
-                style = MaterialTheme.typography.bodySmall,
-                fontWeight = FontWeight.SemiBold,
-                color = if (isLowStock)
-                    MaterialTheme.colorScheme.error
-                else
-                    MaterialTheme.colorScheme.onSurface
-            )
-        }
-        Spacer(modifier = Modifier.height(2.dp))
+        Icon(
+            imageVector = Icons.Filled.Inventory2,
+            contentDescription = null,
+            modifier = Modifier.size(16.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
         Text(
-            text = "Min: $minStock",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            text = "$quantity $unit",
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface
         )
     }
 }
@@ -457,37 +617,109 @@ private fun QuantityInfo(
 /**
  * Empty Inventory State
  * Displayed when there are no materials in inventory
+ * Features fade and scale animation on appearance
  */
 @Composable
 private fun EmptyInventoryState(
     modifier: Modifier = Modifier
 ) {
-    Box(
-        modifier = modifier
-            .fillMaxSize(),
-        contentAlignment = Alignment.Center
+    AnimatedVisibility(
+        visible = true,
+        enter = fadeIn(
+            animationSpec = tween(
+                durationMillis = 300,
+                easing = FastOutSlowInEasing
+            )
+        ) + scaleIn(
+            animationSpec = tween(
+                durationMillis = 300,
+                easing = FastOutSlowInEasing
+            ),
+            initialScale = 0.95f
+        )
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+        Box(
+            modifier = modifier
+                .fillMaxSize(),
+            contentAlignment = Alignment.Center
         ) {
-            Icon(
-                imageVector = Icons.Filled.Inventory2,
-                contentDescription = null,
-                modifier = Modifier.size(64.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Inventory2,
+                    contentDescription = null,
+                    modifier = Modifier.size(64.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = "No Materials",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "Your inventory is empty. Start by adding materials.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Empty Search State
+ * Displayed when search or filter returns no results
+ * Features fade and scale animation on appearance
+ */
+@Composable
+private fun EmptySearchState(
+    modifier: Modifier = Modifier
+) {
+    AnimatedVisibility(
+        visible = true,
+        enter = fadeIn(
+            animationSpec = tween(
+                durationMillis = 300,
+                easing = FastOutSlowInEasing
             )
-            Text(
-                text = "No Materials",
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Text(
-                text = "Your inventory is empty. Start by adding materials.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-            )
+        ) + scaleIn(
+            animationSpec = tween(
+                durationMillis = 300,
+                easing = FastOutSlowInEasing
+            ),
+            initialScale = 0.95f
+        )
+    ) {
+        Box(
+            modifier = modifier
+                .fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Inventory2,
+                    contentDescription = null,
+                    modifier = Modifier.size(64.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = "No Results",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "No materials match your search or filter criteria.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+            }
         }
     }
 }
@@ -496,30 +728,41 @@ private fun EmptyInventoryState(
  * Add Material Dialog
  * Material 3 dialog for adding new materials to the inventory
  * Includes validation for Name and Quantity fields
+ * Allows category selection from fixed dropdown
+ * Features smooth fade-in and scale animation on dialog appearance
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AddMaterialDialog(
+    categories: List<String>,
     onDismiss: () -> Unit,
-    onAdd: (name: String, brand: String, quantity: String) -> Unit
+    onAdd: (name: String, brand: String, quantity: String, category: String) -> Unit
 ) {
     var name by remember { mutableStateOf("") }
     var brand by remember { mutableStateOf("") }
     var quantity by remember { mutableStateOf("") }
+    var selectedCategory by remember { mutableStateOf(categories[0]) }
+    var categoryDropdownExpanded by remember { mutableStateOf(false) }
 
-    // Validation: both name and quantity must be non-empty
+    // Validation: name and quantity must be non-empty, category must be selected
     val isValid = name.isNotBlank() && quantity.isNotBlank() && quantity.toIntOrNull() != null && quantity.toIntOrNull()!! > 0
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        modifier = Modifier
+            .graphicsLayer {
+                alpha = 1f
+            },
         title = {
             Text("Add New Material")
         },
         text = {
             Column(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                // Name field
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
@@ -529,6 +772,7 @@ private fun AddMaterialDialog(
                     placeholder = { Text("e.g., Acrylic Paint") }
                 )
 
+                // Brand field
                 OutlinedTextField(
                     value = brand,
                     onValueChange = { brand = it },
@@ -538,6 +782,54 @@ private fun AddMaterialDialog(
                     placeholder = { Text("e.g., Faber-Castell") }
                 )
 
+                // Category dropdown
+                Box(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    OutlinedTextField(
+                        value = selectedCategory,
+                        onValueChange = {},
+                        label = { Text("Category *") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        readOnly = true,
+                        trailingIcon = {
+                            Icon(
+                                imageVector = Icons.Filled.ArrowDropDown,
+                                contentDescription = null
+                            )
+                        }
+                    )
+                    
+                    DropdownMenu(
+                        expanded = categoryDropdownExpanded,
+                        onDismissRequest = { categoryDropdownExpanded = false },
+                        modifier = Modifier.fillMaxWidth(0.9f)
+                    ) {
+                        categories.forEach { category ->
+                            DropdownMenuItem(
+                                text = { Text(category) },
+                                onClick = {
+                                    selectedCategory = category
+                                    categoryDropdownExpanded = false
+                                }
+                            )
+                        }
+                    }
+
+                    // Invisible button to open dropdown
+                    Button(
+                        onClick = { categoryDropdownExpanded = true },
+                        modifier = Modifier
+                            .matchParentSize()
+                            .alpha(0f),
+                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                            containerColor = Color.Transparent
+                        )
+                    ) {}
+                }
+
+                // Quantity field
                 OutlinedTextField(
                     value = quantity,
                     onValueChange = { quantity = it },
@@ -556,7 +848,7 @@ private fun AddMaterialDialog(
         },
         confirmButton = {
             Button(
-                onClick = { onAdd(name, brand, quantity) },
+                onClick = { onAdd(name, brand, quantity, selectedCategory) },
                 enabled = isValid
             ) {
                 Text("Add")
@@ -573,7 +865,8 @@ private fun AddMaterialDialog(
 /**
  * Edit Material Dialog
  * Material 3 dialog for editing existing materials in the inventory
- * Allows updating name, brand, quantity, category, unit, price, and minimum stock
+ * Allows updating name, brand, quantity, category, unit, and price
+ * Features smooth fade-in and scale animation on dialog appearance
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -588,13 +881,16 @@ private fun EditMaterialDialog(
     var category by remember { mutableStateOf(material.category) }
     var unit by remember { mutableStateOf(material.unit) }
     var price by remember { mutableStateOf(material.price.toString()) }
-    var minStock by remember { mutableStateOf(material.minStock.toString()) }
 
     // Validation: name and quantity must be valid
     val isValid = name.isNotBlank() && quantity.toIntOrNull() != null && quantity.toIntOrNull()!! > 0
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        modifier = Modifier
+            .graphicsLayer {
+                alpha = 1f
+            },
         title = {
             Text("Edit Material")
         },
@@ -652,14 +948,6 @@ private fun EditMaterialDialog(
                     singleLine = true
                 )
 
-                OutlinedTextField(
-                    value = minStock,
-                    onValueChange = { minStock = it },
-                    label = { Text("Minimum Stock") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
-
                 Text(
                     text = "* Required fields",
                     style = MaterialTheme.typography.labelSmall,
@@ -676,8 +964,7 @@ private fun EditMaterialDialog(
                         quantity = quantity.toIntOrNull() ?: material.quantity,
                         category = category,
                         unit = unit,
-                        price = price.toDoubleOrNull() ?: material.price,
-                        minStock = minStock.toIntOrNull() ?: material.minStock
+                        price = price.toDoubleOrNull() ?: material.price
                     )
                     onSave(updatedMaterial)
                 },

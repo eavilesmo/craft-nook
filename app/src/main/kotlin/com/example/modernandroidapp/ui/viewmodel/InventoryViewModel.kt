@@ -7,6 +7,7 @@ import com.example.modernandroidapp.data.repository.IArtMaterialRepository
 import com.example.modernandroidapp.data.repository.InMemoryArtMaterialRepository
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -17,6 +18,23 @@ import kotlinx.coroutines.launch
 class InventoryViewModel(
     private val materialRepository: IArtMaterialRepository = InMemoryArtMaterialRepository()
 ) : ViewModel() {
+
+    companion object {
+        /**
+         * Fixed list of available categories
+         * Users can only assign materials to these categories
+         */
+        val FIXED_CATEGORIES = listOf(
+            "Paint",
+            "Brushes",
+            "Canvas",
+            "Paper",
+            "Pencils",
+            "Markers",
+            "Sketchbooks",
+            "Other"
+        )
+    }
 
     /**
      * StateFlow containing all art materials
@@ -30,10 +48,51 @@ class InventoryViewModel(
         )
 
     /**
-     * StateFlow containing only low stock materials
-     * Emits materials where quantity <= minStock
+     * Search query state
+     * Updates in real-time as user types
      */
-    val lowStockMaterials: StateFlow<List<ArtMaterial>> = materialRepository.getLowStockMaterials()
+    private val _searchQuery = kotlinx.coroutines.flow.MutableStateFlow("")
+    val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
+
+    /**
+     * Selected category filter
+     * "All" means no category filtering
+     */
+    private val _selectedCategory = kotlinx.coroutines.flow.MutableStateFlow("All")
+    val selectedCategory: StateFlow<String> = _selectedCategory.asStateFlow()
+
+    /**
+     * All available categories extracted from materials
+     * Used to populate filter chip options
+     */
+    val availableCategories: StateFlow<List<String>> = allMaterials
+        .combine(_searchQuery) { _, _ ->
+            FIXED_CATEGORIES
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000),
+            initialValue = FIXED_CATEGORIES
+        )
+
+    /**
+     * Filtered materials based on search query and selected category
+     * Updates instantly as user types or selects a category
+     */
+    val filteredMaterials: StateFlow<List<ArtMaterial>> = allMaterials
+        .combine(_searchQuery) { materials, query ->
+            materials.filter { material ->
+                material.name.contains(query, ignoreCase = true) ||
+                material.description.contains(query, ignoreCase = true)
+            }
+        }
+        .combine(_selectedCategory) { searchResults, category ->
+            if (category == "All") {
+                searchResults
+            } else {
+                searchResults.filter { it.category == category }
+            }
+        }
         .stateIn(
             scope = viewModelScope,
             started = kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000),
@@ -44,8 +103,8 @@ class InventoryViewModel(
      * Loading state indicator
      * Can be used for showing/hiding loading indicators
      */
-    private val _isLoading = kotlinx.coroutines.flow.MutableStateFlow(false)
-    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+     private val _isLoading = kotlinx.coroutines.flow.MutableStateFlow(false)
+     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
     /**
      * Error message state
@@ -87,13 +146,23 @@ class InventoryViewModel(
     }
 
     /**
-     * Check if a material is low on stock
+     * Update the search query
+     * Filters materials by name and description in real-time
      *
-     * @param material The material to check
-     * @return true if quantity <= minStock, false otherwise
+     * @param query Search query string
      */
-    fun isLowStock(material: ArtMaterial): Boolean {
-        return material.quantity <= material.minStock
+    fun updateSearchQuery(query: String) {
+        _searchQuery.value = query
+    }
+
+    /**
+     * Select a category filter
+     * Updates the filtered materials list instantly
+     *
+     * @param category Category name or "All" for no filter
+     */
+    fun selectCategory(category: String) {
+        _selectedCategory.value = category
     }
 
     /**
@@ -103,15 +172,16 @@ class InventoryViewModel(
      * @param name Name of the material
      * @param brand Brand or manufacturer name
      * @param quantity Initial quantity
+     * @param category Category of the material
      * @return Result with the created ArtMaterial on success, Exception on failure
      */
-    fun addMaterial(name: String, brand: String, quantity: Int) {
+    fun addMaterial(name: String, brand: String, quantity: Int, category: String) {
         viewModelScope.launch {
             try {
                 _isLoading.value = true
                 _errorMessage.value = null
 
-                val result = materialRepository.addMaterial(name, brand, quantity)
+                val result = materialRepository.addMaterial(name, brand, quantity, category)
                 result.onFailure { exception ->
                     _errorMessage.value = exception.message ?: "Failed to add material"
                 }

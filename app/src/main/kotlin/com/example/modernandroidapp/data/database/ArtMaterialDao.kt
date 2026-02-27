@@ -24,13 +24,6 @@ interface ArtMaterialDao {
     fun getAllMaterials(): Flow<List<ArtMaterial>>
 
     /**
-     * Get materials with low stock (quantity <= minStock)
-     * @return Flow of list of low stock materials
-     */
-    @Query("SELECT * FROM art_materials WHERE quantity <= minStock ORDER BY name ASC")
-    fun getLowStockMaterials(): Flow<List<ArtMaterial>>
-
-    /**
      * Get a specific material by ID
      * @param materialId ID of the material
      * @return Flow of the material or null if not found

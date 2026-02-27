@@ -21,7 +21,6 @@ data class ArtMaterial(
     val quantity: Int,
     val unit: String,
     val price: Double,
-    val minStock: Int,
     val lastUpdated: Long = System.currentTimeMillis()
 )
 
@@ -35,12 +34,6 @@ interface IArtMaterialRepository {
      * @return Flow of list of all materials
      */
     fun getAllMaterials(): Flow<List<ArtMaterial>>
-
-    /**
-     * Get materials with low stock (quantity <= minStock)
-     * @return Flow of list of low stock materials
-     */
-    fun getLowStockMaterials(): Flow<List<ArtMaterial>>
 
     /**
      * Update the quantity of a material
@@ -62,9 +55,10 @@ interface IArtMaterialRepository {
      * @param name Name of the material
      * @param brand Brand or manufacturer name
      * @param quantity Initial quantity
+     * @param category Category of the material
      * @return Result with the created ArtMaterial on success, Exception on failure
      */
-    suspend fun addMaterial(name: String, brand: String, quantity: Int): Result<ArtMaterial>
+    suspend fun addMaterial(name: String, brand: String, quantity: Int, category: String = "Other"): Result<ArtMaterial>
 
     /**
      * Delete a material from the inventory
@@ -88,70 +82,64 @@ interface IArtMaterialRepository {
  */
 class InMemoryArtMaterialRepository : IArtMaterialRepository {
 
-    private val _materials = MutableStateFlow<List<ArtMaterial>>(
-        listOf(
-            ArtMaterial(
-                id = "1",
-                name = "Acrylic Paint - Red",
-                description = "Bright red acrylic paint",
-                category = "Paint",
-                quantity = 5,
-                unit = "bottle",
-                price = 12.99,
-                minStock = 10
-            ),
-            ArtMaterial(
-                id = "2",
-                name = "Canvas - 8x10",
-                description = "Blank canvas 8x10 inches",
-                category = "Canvas",
-                quantity = 3,
-                unit = "piece",
-                price = 8.50,
-                minStock = 5
-            ),
-            ArtMaterial(
-                id = "3",
-                name = "Brush Set - Professional",
-                description = "Set of 12 professional brushes",
-                category = "Brushes",
-                quantity = 2,
-                unit = "set",
-                price = 24.99,
-                minStock = 3
-            ),
-            ArtMaterial(
-                id = "4",
-                name = "Watercolor Set",
-                description = "24-color watercolor palette",
-                category = "Paint",
-                quantity = 7,
-                unit = "palette",
-                price = 18.75,
-                minStock = 5
-            ),
-            ArtMaterial(
-                id = "5",
-                name = "Sketchbook - A4",
-                description = "A4 blank sketchbook 100 pages",
-                category = "Paper",
-                quantity = 15,
-                unit = "book",
-                price = 9.99,
-                minStock = 8
-            ),
-            ArtMaterial(
-                id = "6",
-                name = "Oil Paint - Blue",
+     private val _materials = MutableStateFlow<List<ArtMaterial>>(
+         listOf(
+             ArtMaterial(
+                 id = "1",
+                 name = "Acrylic Paint - Red",
+                 description = "Bright red acrylic paint",
+                 category = "Paint",
+                 quantity = 5,
+                 unit = "bottle",
+                 price = 12.99
+             ),
+             ArtMaterial(
+                 id = "2",
+                 name = "Canvas - 8x10",
+                 description = "Blank canvas 8x10 inches",
+                 category = "Canvas",
+                 quantity = 3,
+                 unit = "piece",
+                 price = 8.50
+             ),
+             ArtMaterial(
+                 id = "3",
+                 name = "Brush Set - Professional",
+                 description = "Set of 12 professional brushes",
+                 category = "Brushes",
+                 quantity = 2,
+                 unit = "set",
+                 price = 24.99
+             ),
+             ArtMaterial(
+                 id = "4",
+                 name = "Watercolor Set",
+                 description = "24-color watercolor palette",
+                 category = "Paint",
+                 quantity = 7,
+                 unit = "palette",
+                 price = 18.75
+             ),
+             ArtMaterial(
+                 id = "5",
+                 name = "Sketchbook - A4",
+                 description = "A4 blank sketchbook 100 pages",
+                 category = "Paper",
+                 quantity = 15,
+                 unit = "book",
+                 price = 9.99
+             ),
+             ArtMaterial(
+                 id = "6",
+                 name = "Oil Paint - Blue",
                 description = "Professional grade oil paint",
                 category = "Paint",
                 quantity = 2,
                 unit = "tube",
-                price = 15.50,
-                minStock = 4
-            )
-        )
-    )
+                 price = 15.50
+             )
+         )
+     )
 
     private val materials = _materials.asStateFlow()
 
@@ -167,14 +155,6 @@ class InMemoryArtMaterialRepository : IArtMaterialRepository {
      * Get materials with low stock as a reactive Flow
      * Filters materials where quantity <= minStock
      */
-    override fun getLowStockMaterials(): Flow<List<ArtMaterial>> {
-        return materials.map { allMaterials ->
-            allMaterials.filter { material ->
-                material.quantity <= material.minStock
-            }
-        }
-    }
-
     /**
      * Update quantity of a material by ID
      * Updates the in-memory state and returns success/failure result
@@ -233,9 +213,10 @@ class InMemoryArtMaterialRepository : IArtMaterialRepository {
      * @param name Name of the material
      * @param brand Brand or manufacturer name (used as description)
      * @param quantity Initial quantity (must be > 0)
+     * @param category Category of the material
      * @return Result with the created ArtMaterial on success, Exception on failure
      */
-    override suspend fun addMaterial(name: String, brand: String, quantity: Int): Result<ArtMaterial> {
+    override suspend fun addMaterial(name: String, brand: String, quantity: Int, category: String): Result<ArtMaterial> {
         return try {
             // Validate inputs
             if (name.isBlank()) {
@@ -251,14 +232,13 @@ class InMemoryArtMaterialRepository : IArtMaterialRepository {
             // Create new material with sensible defaults
             val newMaterial = ArtMaterial(
                 id = newId,
-                name = name,
-                description = brand.ifBlank { "No brand specified" },
-                category = "Other", // Default category
-                quantity = quantity,
-                unit = "unit", // Default unit
-                price = 0.0, // Default price (can be updated later)
-                minStock = 5 // Default min stock threshold
-            )
+                 name = name,
+                 description = brand.ifBlank { "No brand specified" },
+                 category = category,
+                 quantity = quantity,
+                 unit = "unit", // Default unit
+                 price = 0.0 // Default price (can be updated later)
+             )
 
             // Add to the list
             _materials.value = _materials.value + newMaterial
@@ -287,8 +267,7 @@ class InMemoryArtMaterialRepository : IArtMaterialRepository {
                 category = "Paint",
                 quantity = 5,
                 unit = "bottle",
-                price = 12.99,
-                minStock = 10
+                price = 12.99
             ),
             ArtMaterial(
                 id = "2",
@@ -297,8 +276,7 @@ class InMemoryArtMaterialRepository : IArtMaterialRepository {
                 category = "Canvas",
                 quantity = 3,
                 unit = "piece",
-                price = 8.50,
-                minStock = 5
+                price = 8.50
             ),
             ArtMaterial(
                 id = "3",
@@ -307,8 +285,7 @@ class InMemoryArtMaterialRepository : IArtMaterialRepository {
                 category = "Brushes",
                 quantity = 2,
                 unit = "set",
-                price = 24.99,
-                minStock = 3
+                price = 24.99
             ),
             ArtMaterial(
                 id = "4",
@@ -317,8 +294,7 @@ class InMemoryArtMaterialRepository : IArtMaterialRepository {
                 category = "Paint",
                 quantity = 7,
                 unit = "palette",
-                price = 18.75,
-                minStock = 5
+                price = 18.75
             ),
             ArtMaterial(
                 id = "5",
@@ -327,8 +303,7 @@ class InMemoryArtMaterialRepository : IArtMaterialRepository {
                 category = "Paper",
                 quantity = 15,
                 unit = "book",
-                price = 9.99,
-                minStock = 8
+                price = 9.99
             ),
             ArtMaterial(
                 id = "6",
@@ -337,8 +312,7 @@ class InMemoryArtMaterialRepository : IArtMaterialRepository {
                 category = "Paint",
                 quantity = 2,
                 unit = "tube",
-                price = 15.50,
-                minStock = 4
+                price = 15.50
             )
         )
     }
