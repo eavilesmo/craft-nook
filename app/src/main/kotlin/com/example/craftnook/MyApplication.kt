@@ -1,4 +1,4 @@
-package com.example.modernandroidapp
+package com.example.craftnook
 
 import android.app.Application
 import dagger.hilt.android.HiltAndroidApp

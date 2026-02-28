@@ -7,11 +7,11 @@ plugins {
 }
 
 android {
-    namespace = "com.example.modernandroidapp"
+    namespace = "com.example.craftnook"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.example.modernandroidapp"
+        applicationId = "com.example.craftnook"
         minSdk = 26
         targetSdk = 34
         versionCode = 1

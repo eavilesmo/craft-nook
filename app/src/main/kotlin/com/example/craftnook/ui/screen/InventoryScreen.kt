@@ -1,4 +1,4 @@
-package com.example.modernandroidapp.ui.screen
+package com.example.craftnook.ui.screen
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -9,6 +9,8 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,6 +18,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -26,23 +29,24 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Category
-import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -50,38 +54,44 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.draw.alpha
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.ui.graphics.graphicsLayer
-import com.example.modernandroidapp.data.repository.ArtMaterial
-import com.example.modernandroidapp.ui.viewmodel.InventoryViewModel
-import com.example.modernandroidapp.ui.theme.CategoryPaintColor
-import com.example.modernandroidapp.ui.theme.CategoryBrushesColor
-import com.example.modernandroidapp.ui.theme.CategoryCanvasColor
-import com.example.modernandroidapp.ui.theme.CategoryPaperColor
-import com.example.modernandroidapp.ui.theme.CategoryPencilsColor
-import com.example.modernandroidapp.ui.theme.CategoryMarkersColor
-import com.example.modernandroidapp.ui.theme.CategorySketchbooksColor
-import com.example.modernandroidapp.ui.theme.CategoryOtherColor
+import com.example.craftnook.data.repository.ArtMaterial
+import com.example.craftnook.ui.components.MaterialDetailsBottomSheet
+import com.example.craftnook.ui.theme.CategoryBrushesColor
+import com.example.craftnook.ui.theme.CategoryCanvasColor
+import com.example.craftnook.ui.theme.CategoryMarkersColor
+import com.example.craftnook.ui.theme.CategoryOtherColor
+import com.example.craftnook.ui.theme.CategoryPaintColor
+import com.example.craftnook.ui.theme.CategoryPaperColor
+import com.example.craftnook.ui.theme.CategoryPencilsColor
+import com.example.craftnook.ui.theme.CategorySketchbooksColor
+import com.example.craftnook.ui.theme.OutlineLight
+import com.example.craftnook.ui.viewmodel.InventoryViewModel
+import kotlinx.coroutines.launch
 
 /**
  * Main Inventory Screen
  * Displays a list of art materials with their details and stock status
  * Includes search and category filtering
+ * Materials are clickable to view details
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun InventoryScreen(
     viewModel: InventoryViewModel
@@ -93,6 +103,11 @@ fun InventoryScreen(
     val availableCategories by viewModel.availableCategories.collectAsState()
     var showAddMaterialDialog by remember { mutableStateOf(false) }
     var fabPressed by remember { mutableStateOf(false) }
+    
+    // Material details bottom sheet state
+    var selectedMaterial by remember { mutableStateOf<ArtMaterial?>(null) }
+    val bottomSheetState = rememberModalBottomSheetState()
+    val coroutineScope = rememberCoroutineScope()
 
     Scaffold(
         topBar = {
@@ -154,13 +169,35 @@ fun InventoryScreen(
             } else {
                 MaterialsList(
                     materials = filteredMaterials,
+                    categories = availableCategories,
                     viewModel = viewModel,
+                    onMaterialClick = { material ->
+                        selectedMaterial = material
+                        coroutineScope.launch {
+                            bottomSheetState.show()
+                        }
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
+                     .padding(bottom = 32.dp) // Extra padding to avoid FAB overlap
                 )
             }
         }
+    }
+
+    // Material details bottom sheet
+    if (selectedMaterial != null) {
+            MaterialDetailsBottomSheet(
+                material = selectedMaterial!!,
+                sheetState = bottomSheetState,
+                onDismiss = {
+                    coroutineScope.launch {
+                        bottomSheetState.hide()
+                    selectedMaterial = null
+                }
+            }
+        )
     }
 
     if (showAddMaterialDialog) {
@@ -261,7 +298,7 @@ private fun CategoryFilterRow(
 
 /**
  * Top app bar for inventory screen
- * Shows title and total inventory count
+ * Shows title, total inventory count, and analytics toggle button
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -270,20 +307,14 @@ private fun InventoryTopAppBar(
 ) {
     TopAppBar(
         title = {
-            Column {
-                Text(
-                    text = "Craft Nook",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Medium,
-                    letterSpacing = 0.5.sp
-                )
-                Text(
-                    text = "$totalItems materials",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f)
-                )
-            }
+            Text(
+                text = "Craft Nook",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Medium,
+                letterSpacing = 0.5.sp
+            )
         },
+        actions = {},
         colors = TopAppBarDefaults.topAppBarColors(
             containerColor = MaterialTheme.colorScheme.primary,
             titleContentColor = MaterialTheme.colorScheme.onPrimary
@@ -299,13 +330,15 @@ private fun InventoryTopAppBar(
 @Composable
 private fun MaterialsList(
     materials: List<ArtMaterial>,
+    categories: List<String>,
     viewModel: InventoryViewModel,
+    onMaterialClick: (ArtMaterial) -> Unit,
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
         items(
             items = materials,
@@ -329,8 +362,10 @@ private fun MaterialsList(
             ) {
                 InventoryItemCard(
                     material = material,
+                    categories = categories,
                     onEdit = { updatedMaterial -> viewModel.updateMaterial(updatedMaterial) },
-                    onDelete = { viewModel.deleteMaterial(material.id) }
+                    onDelete = { viewModel.deleteMaterial(material.id) },
+                    onClick = { onMaterialClick(material) }
                 )
             }
         }
@@ -341,14 +376,17 @@ private fun MaterialsList(
  * Inventory Item Card
  * Shows individual art material details with edit and delete buttons
  * Includes scale and fade animations on button press
+ * Clickable to open material details bottom sheet
  *
  * Uses Material 3 Card component
  */
 @Composable
 private fun InventoryItemCard(
     material: ArtMaterial,
+    categories: List<String>,
     onEdit: (ArtMaterial) -> Unit = {},
     onDelete: () -> Unit = {},
+    onClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var showDeleteConfirmation by remember { mutableStateOf(false) }
@@ -358,18 +396,27 @@ private fun InventoryItemCard(
 
     Card(
         modifier = modifier
-            .fillMaxWidth(),
+            .fillMaxWidth()
+            .clickable(
+                enabled = true,
+                onClick = onClick,
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null
+            ),
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
         elevation = CardDefaults.cardElevation(
-            defaultElevation = 2.dp
+            defaultElevation = 1.dp
         ),
-        border = androidx.compose.material3.CardDefaults.outlinedCardBorder()
+        border = androidx.compose.foundation.BorderStroke(
+            width = 1.dp,
+            color = OutlineLight
+        )
     ) {
         Column(
-            modifier = Modifier.padding(20.dp)
+            modifier = Modifier.padding(24.dp)
         ) {
             // Header row with name
             Row(
@@ -416,7 +463,7 @@ private fun InventoryItemCard(
                                 scaleX = if (editButtonPressed) 0.95f else 1f
                                 scaleY = if (editButtonPressed) 0.95f else 1f
                             },
-                        shape = RoundedCornerShape(6.dp),
+                        shape = RoundedCornerShape(10.dp),
                         colors = androidx.compose.material3.ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.primary,
                             contentColor = MaterialTheme.colorScheme.onPrimary
@@ -426,7 +473,7 @@ private fun InventoryItemCard(
                         Icon(
                             imageVector = Icons.Filled.Edit,
                             contentDescription = "Edit material",
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(18.dp)
                         )
                     }
 
@@ -438,21 +485,21 @@ private fun InventoryItemCard(
                         },
                         modifier = Modifier
                             .size(40.dp)
-                            .border(1.5.dp, Color(0xFFCBD5E0), RoundedCornerShape(8.dp))
+                            .border(1.dp, OutlineLight, RoundedCornerShape(10.dp))
                             .graphicsLayer {
                                 scaleX = if (deleteButtonPressed) 0.95f else 1f
                                 scaleY = if (deleteButtonPressed) 0.95f else 1f
                             },
-                        shape = RoundedCornerShape(8.dp),
+                        shape = RoundedCornerShape(10.dp),
                         colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(
-                            contentColor = Color(0xFF718096)
+                            contentColor = MaterialTheme.colorScheme.onSurface
                         ),
                         contentPadding = PaddingValues(0.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Outlined.Delete,
                             contentDescription = "Delete material",
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(18.dp)
                         )
                     }
                 }
@@ -486,6 +533,7 @@ private fun InventoryItemCard(
     if (showEditDialog) {
         EditMaterialDialog(
             material = material,
+            categories = categories,
             onDismiss = { 
                 showEditDialog = false
                 editButtonPressed = false
@@ -565,9 +613,10 @@ private fun CategoryBadge(
         modifier = modifier
             .background(
                 color = backgroundColor,
-                shape = RoundedCornerShape(14.dp)
+                shape = RoundedCornerShape(18.dp)
             )
-            .padding(horizontal = 14.dp, vertical = 10.dp)
+            .border(1.dp, OutlineLight.copy(alpha = 0.6f), RoundedCornerShape(18.dp))
+            .padding(horizontal = 16.dp, vertical = 10.dp)
             .graphicsLayer {
                 scaleX = if (isHovered) 1.05f else 1f
                 scaleY = if (isHovered) 1.05f else 1f
@@ -576,10 +625,10 @@ private fun CategoryBadge(
     ) {
         Text(
             text = category,
-            style = MaterialTheme.typography.labelSmall,
+            style = MaterialTheme.typography.bodySmall,
             color = textColor,
             fontWeight = FontWeight.Medium,
-            letterSpacing = 0.3.sp
+            letterSpacing = 0.2.sp
         )
     }
 }
@@ -599,12 +648,6 @@ private fun QuantityInfo(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        Icon(
-            imageVector = Icons.Filled.Inventory2,
-            contentDescription = null,
-            modifier = Modifier.size(16.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant
-        )
         Text(
             text = "$quantity $unit",
             style = MaterialTheme.typography.bodySmall,
@@ -865,32 +908,27 @@ private fun AddMaterialDialog(
 /**
  * Edit Material Dialog
  * Material 3 dialog for editing existing materials in the inventory
- * Allows updating name, brand, quantity, category, unit, and price
- * Features smooth fade-in and scale animation on dialog appearance
+ * Uses a numeric stepper for quantity and proper dropdowns for category/unit
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun EditMaterialDialog(
     material: ArtMaterial,
+    categories: List<String>,
     onDismiss: () -> Unit,
     onSave: (ArtMaterial) -> Unit
 ) {
     var name by remember { mutableStateOf(material.name) }
     var brand by remember { mutableStateOf(material.description) }
-    var quantity by remember { mutableStateOf(material.quantity.toString()) }
+    var quantity by remember { mutableStateOf(material.quantity) }
     var category by remember { mutableStateOf(material.category) }
     var unit by remember { mutableStateOf(material.unit) }
-    var price by remember { mutableStateOf(material.price.toString()) }
+    var categoryDropdownExpanded by remember { mutableStateOf(false) }
 
-    // Validation: name and quantity must be valid
-    val isValid = name.isNotBlank() && quantity.toIntOrNull() != null && quantity.toIntOrNull()!! > 0
+    val isValid = name.isNotBlank()
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        modifier = Modifier
-            .graphicsLayer {
-                alpha = 1f
-            },
         title = {
             Text("Edit Material")
         },
@@ -916,36 +954,116 @@ private fun EditMaterialDialog(
                     singleLine = true
                 )
 
-                OutlinedTextField(
-                    value = quantity,
-                    onValueChange = { quantity = it },
-                    label = { Text("Quantity *") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
+                // Category dropdown
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = category,
+                        onValueChange = {},
+                        label = { Text("Category") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        readOnly = true,
+                        trailingIcon = {
+                            Icon(
+                                imageVector = Icons.Filled.ArrowDropDown,
+                                contentDescription = null
+                            )
+                        }
+                    )
+                    DropdownMenu(
+                        expanded = categoryDropdownExpanded,
+                        onDismissRequest = { categoryDropdownExpanded = false },
+                        modifier = Modifier.fillMaxWidth(0.9f)
+                    ) {
+                        categories.forEach { cat ->
+                            DropdownMenuItem(
+                                text = { Text(cat) },
+                                onClick = {
+                                    category = cat
+                                    categoryDropdownExpanded = false
+                                }
+                            )
+                        }
+                    }
+                    Button(
+                        onClick = { categoryDropdownExpanded = true },
+                        modifier = Modifier
+                            .matchParentSize()
+                            .alpha(0f),
+                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                            containerColor = Color.Transparent
+                        )
+                    ) {}
+                }
 
-                OutlinedTextField(
-                    value = category,
-                    onValueChange = { category = it },
-                    label = { Text("Category") },
+                // Quantity Stepper
+                Column(
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "Quantity *",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(52.dp)
+                            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp)),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        // Minus button
+                        IconButton(
+                            onClick = { quantity = (quantity - 1).coerceAtLeast(0) },
+                            modifier = Modifier
+                                .weight(0.2f)
+                                .fillMaxHeight()
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Remove,
+                                contentDescription = "Decrease quantity",
+                                modifier = Modifier.size(20.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+
+                        // Quantity display
+                        Text(
+                            text = quantity.toString(),
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.weight(0.6f),
+                            textAlign = TextAlign.Center,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+
+                        // Plus button
+                        IconButton(
+                            onClick = { quantity += 1 },
+                            modifier = Modifier
+                                .weight(0.2f)
+                                .fillMaxHeight()
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = "Increase quantity",
+                                modifier = Modifier.size(20.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                }
 
                 OutlinedTextField(
                     value = unit,
                     onValueChange = { unit = it },
                     label = { Text("Unit") },
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
-
-                OutlinedTextField(
-                    value = price,
-                    onValueChange = { price = it },
-                    label = { Text("Price") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
+                    singleLine = true,
+                    placeholder = { Text("e.g., bottle, tube, sheet") }
                 )
 
                 Text(
@@ -961,10 +1079,9 @@ private fun EditMaterialDialog(
                     val updatedMaterial = material.copy(
                         name = name,
                         description = brand,
-                        quantity = quantity.toIntOrNull() ?: material.quantity,
+                        quantity = quantity,
                         category = category,
-                        unit = unit,
-                        price = price.toDoubleOrNull() ?: material.price
+                        unit = unit
                     )
                     onSave(updatedMaterial)
                 },

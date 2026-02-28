@@ -14,6 +14,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Modern Android App"
+rootProject.name = "Craft Nook"
 
 include(":app")

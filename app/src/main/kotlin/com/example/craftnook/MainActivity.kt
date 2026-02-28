@@ -1,4 +1,4 @@
-package com.example.modernandroidapp
+package com.example.craftnook
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -7,9 +7,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.example.modernandroidapp.ui.navigation.AppNavigation
-import com.example.modernandroidapp.ui.theme.CraftNookTheme
-import com.example.modernandroidapp.ui.viewmodel.InventoryViewModel
+import com.example.craftnook.ui.navigation.AppNavigation
+import com.example.craftnook.ui.theme.CraftNookTheme
+import com.example.craftnook.ui.viewmodel.InventoryViewModel
 import dagger.hilt.android.AndroidEntryPoint
 
 /**

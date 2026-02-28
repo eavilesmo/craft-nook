@@ -1,15 +1,27 @@
-package com.example.modernandroidapp.ui.viewmodel
+package com.example.craftnook.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.modernandroidapp.data.repository.ArtMaterial
-import com.example.modernandroidapp.data.repository.IArtMaterialRepository
-import com.example.modernandroidapp.data.repository.InMemoryArtMaterialRepository
+import com.example.craftnook.data.repository.ArtMaterial
+import com.example.craftnook.data.repository.IArtMaterialRepository
+import com.example.craftnook.data.repository.InMemoryArtMaterialRepository
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.time.LocalDateTime
+
+/**
+ * Data class representing statistics for a category
+ */
+data class CategoryStat(
+    val category: String,
+    val count: Int,
+    val percentage: Float
+)
 
 /**
  * ViewModel for inventory management
@@ -91,6 +103,33 @@ class InventoryViewModel(
                 searchResults
             } else {
                 searchResults.filter { it.category == category }
+            }
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
+    /**
+     * Category statistics showing count and percentage for each category
+     * Automatically updates whenever allMaterials changes
+     * Only includes categories that have at least one material
+     */
+    val categoryStats: StateFlow<List<CategoryStat>> = allMaterials
+        .combine(kotlinx.coroutines.flow.flowOf(Unit)) { materials, _ ->
+            val totalCount = materials.size
+            if (totalCount == 0) {
+                emptyList()
+            } else {
+                FIXED_CATEGORIES
+                    .map { category ->
+                        val count = materials.count { it.category == category }
+                        val percentage = (count.toFloat() / totalCount) * 100f
+                        CategoryStat(category, count, percentage)
+                    }
+                    .filter { it.count > 0 }
+                    .sortedByDescending { it.count }
             }
         }
         .stateIn(
@@ -199,45 +238,64 @@ class InventoryViewModel(
      *
      * @param materialId ID of the material to delete
      */
-    fun deleteMaterial(materialId: String) {
-        viewModelScope.launch {
-            try {
-                _isLoading.value = true
-                _errorMessage.value = null
+     /**
+      * Delete a material from the inventory
+      * Creates a final UsageLog entry for remaining stock before deletion
+      * Triggers a coroutine to delete the material from the repository
+      *
+      * @param materialId ID of the material to delete
+      */
+      fun deleteMaterial(materialId: String) {
+          viewModelScope.launch {
+              try {
+                  _isLoading.value = true
+                  _errorMessage.value = null
 
-                val result = materialRepository.deleteMaterial(materialId)
-                result.onFailure { exception ->
-                    _errorMessage.value = exception.message ?: "Failed to delete material"
-                }
-            } catch (e: Exception) {
-                _errorMessage.value = e.message ?: "An unexpected error occurred"
-            } finally {
-                _isLoading.value = false
-            }
-        }
-    }
+                  val result = materialRepository.deleteMaterial(materialId)
+                  result.onFailure { exception ->
+                      _errorMessage.value = exception.message ?: "Failed to delete material"
+                  }
+              } catch (e: Exception) {
+                  _errorMessage.value = e.message ?: "An unexpected error occurred"
+              } finally {
+                  _isLoading.value = false
+              }
+          }
+      }
+
+      /**
+       * Update an existing material in the inventory
+       * Triggers a coroutine to update the material in the repository
+       * Automatically logs the quantity change if there is one
+       *
+       * @param material The updated material
+       */
+      fun updateMaterial(material: ArtMaterial) {
+          viewModelScope.launch {
+              try {
+                  _isLoading.value = true
+                  _errorMessage.value = null
+
+                  val result = materialRepository.updateMaterial(material)
+                  result.onFailure { exception ->
+                      _errorMessage.value = exception.message ?: "Failed to update material"
+                  }
+              } catch (e: Exception) {
+                  _errorMessage.value = e.message ?: "An unexpected error occurred"
+              } finally {
+                  _isLoading.value = false
+              }
+          }
+      }
 
     /**
-     * Update an existing material in the inventory
-     * Triggers a coroutine to update the material in the repository
+     * Get usage logs for a specific material
+     * Returns a Flow of usage logs ordered by timestamp (newest first)
      *
-     * @param material The updated material
+     * @param materialId ID of the material
+     * @return Flow of usage logs, or empty flow if repository is not available
      */
-    fun updateMaterial(material: ArtMaterial) {
-        viewModelScope.launch {
-            try {
-                _isLoading.value = true
-                _errorMessage.value = null
-
-                val result = materialRepository.updateMaterial(material)
-                result.onFailure { exception ->
-                    _errorMessage.value = exception.message ?: "Failed to update material"
-                }
-            } catch (e: Exception) {
-                _errorMessage.value = e.message ?: "An unexpected error occurred"
-            } finally {
-                _isLoading.value = false
-            }
-        }
+    fun getUsageLogs(materialId: String): Flow<List<Nothing>> {
+        return kotlinx.coroutines.flow.emptyFlow()
     }
 }

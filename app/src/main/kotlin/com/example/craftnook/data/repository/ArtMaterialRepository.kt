@@ -1,4 +1,4 @@
-package com.example.modernandroidapp.data.repository
+package com.example.craftnook.data.repository
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
@@ -20,7 +20,6 @@ data class ArtMaterial(
     val category: String,
     val quantity: Int,
     val unit: String,
-    val price: Double,
     val lastUpdated: Long = System.currentTimeMillis()
 )
 
@@ -82,64 +81,58 @@ interface IArtMaterialRepository {
  */
 class InMemoryArtMaterialRepository : IArtMaterialRepository {
 
-     private val _materials = MutableStateFlow<List<ArtMaterial>>(
-         listOf(
-             ArtMaterial(
-                 id = "1",
-                 name = "Acrylic Paint - Red",
-                 description = "Bright red acrylic paint",
-                 category = "Paint",
-                 quantity = 5,
-                 unit = "bottle",
-                 price = 12.99
-             ),
-             ArtMaterial(
-                 id = "2",
-                 name = "Canvas - 8x10",
-                 description = "Blank canvas 8x10 inches",
-                 category = "Canvas",
-                 quantity = 3,
-                 unit = "piece",
-                 price = 8.50
-             ),
-             ArtMaterial(
-                 id = "3",
-                 name = "Brush Set - Professional",
-                 description = "Set of 12 professional brushes",
-                 category = "Brushes",
-                 quantity = 2,
-                 unit = "set",
-                 price = 24.99
-             ),
-             ArtMaterial(
-                 id = "4",
-                 name = "Watercolor Set",
-                 description = "24-color watercolor palette",
-                 category = "Paint",
-                 quantity = 7,
-                 unit = "palette",
-                 price = 18.75
-             ),
-             ArtMaterial(
-                 id = "5",
-                 name = "Sketchbook - A4",
-                 description = "A4 blank sketchbook 100 pages",
-                 category = "Paper",
-                 quantity = 15,
-                 unit = "book",
-                 price = 9.99
-             ),
-             ArtMaterial(
-                 id = "6",
-                 name = "Oil Paint - Blue",
-                description = "Professional grade oil paint",
-                category = "Paint",
-                quantity = 2,
-                unit = "tube",
-                 price = 15.50
-             )
-         )
-     )
+      private val _materials = MutableStateFlow<List<ArtMaterial>>(
+          listOf(
+              ArtMaterial(
+                  id = "1",
+                  name = "Acrylic Paint - Red",
+                  description = "Bright red acrylic paint",
+                  category = "Paint",
+                  quantity = 5,
+                  unit = "bottle"
+              ),
+              ArtMaterial(
+                  id = "2",
+                  name = "Canvas - 8x10",
+                  description = "Blank canvas 8x10 inches",
+                  category = "Canvas",
+                  quantity = 3,
+                  unit = "piece"
+              ),
+              ArtMaterial(
+                  id = "3",
+                  name = "Brush Set - Professional",
+                  description = "Set of 12 professional brushes",
+                  category = "Brushes",
+                  quantity = 2,
+                  unit = "set"
+              ),
+              ArtMaterial(
+                  id = "4",
+                  name = "Watercolor Set",
+                  description = "24-color watercolor palette",
+                  category = "Paint",
+                  quantity = 7,
+                  unit = "palette"
+              ),
+              ArtMaterial(
+                  id = "5",
+                  name = "Sketchbook - A4",
+                  description = "A4 blank sketchbook 100 pages",
+                  category = "Paper",
+                  quantity = 15,
+                  unit = "book"
+              ),
+              ArtMaterial(
+                  id = "6",
+                  name = "Oil Paint - Blue",
+                  description = "Professional grade oil paint",
+                  category = "Paint",
+                  quantity = 2,
+                  unit = "tube"
+              )
+          )
+      )
 
     private val materials = _materials.asStateFlow()
 
@@ -229,16 +222,15 @@ class InMemoryArtMaterialRepository : IArtMaterialRepository {
             // Generate unique ID
             val newId = (_materials.value.maxOfOrNull { it.id.toIntOrNull() ?: 0 } ?: 0).plus(1).toString()
 
-            // Create new material with sensible defaults
-            val newMaterial = ArtMaterial(
-                id = newId,
-                 name = name,
-                 description = brand.ifBlank { "No brand specified" },
-                 category = category,
-                 quantity = quantity,
-                 unit = "unit", // Default unit
-                 price = 0.0 // Default price (can be updated later)
-             )
+             // Create new material with sensible defaults
+             val newMaterial = ArtMaterial(
+                 id = newId,
+                  name = name,
+                  description = brand.ifBlank { "No brand specified" },
+                  category = category,
+                  quantity = quantity,
+                  unit = "unit" // Default unit
+              )
 
             // Add to the list
             _materials.value = _materials.value + newMaterial
@@ -266,8 +258,7 @@ class InMemoryArtMaterialRepository : IArtMaterialRepository {
                 description = "Bright red acrylic paint",
                 category = "Paint",
                 quantity = 5,
-                unit = "bottle",
-                price = 12.99
+                unit = "bottle"
             ),
             ArtMaterial(
                 id = "2",
@@ -275,8 +266,7 @@ class InMemoryArtMaterialRepository : IArtMaterialRepository {
                 description = "Blank canvas 8x10 inches",
                 category = "Canvas",
                 quantity = 3,
-                unit = "piece",
-                price = 8.50
+                unit = "piece"
             ),
             ArtMaterial(
                 id = "3",
@@ -284,8 +274,7 @@ class InMemoryArtMaterialRepository : IArtMaterialRepository {
                 description = "Set of 12 professional brushes",
                 category = "Brushes",
                 quantity = 2,
-                unit = "set",
-                price = 24.99
+                unit = "set"
             ),
             ArtMaterial(
                 id = "4",
@@ -293,8 +282,7 @@ class InMemoryArtMaterialRepository : IArtMaterialRepository {
                 description = "24-color watercolor palette",
                 category = "Paint",
                 quantity = 7,
-                unit = "palette",
-                price = 18.75
+                unit = "palette"
             ),
             ArtMaterial(
                 id = "5",
@@ -302,8 +290,7 @@ class InMemoryArtMaterialRepository : IArtMaterialRepository {
                 description = "A4 blank sketchbook 100 pages",
                 category = "Paper",
                 quantity = 15,
-                unit = "book",
-                price = 9.99
+                unit = "book"
             ),
             ArtMaterial(
                 id = "6",
@@ -311,8 +298,7 @@ class InMemoryArtMaterialRepository : IArtMaterialRepository {
                 description = "Professional grade oil paint",
                 category = "Paint",
                 quantity = 2,
-                unit = "tube",
-                price = 15.50
+                unit = "tube"
             )
         )
     }

@@ -1,6 +1,6 @@
-# Modern Android App
+# Craft Nook
 
-A production-ready Android application built with **Kotlin**, **Jetpack Compose**, **Room Database**, and **Hilt Dependency Injection**, following **MVVM + Clean Architecture** principles.
+A production-ready Android inventory management application built with **Kotlin**, **Jetpack Compose**, **Room Database**, and **Hilt Dependency Injection**, following **MVVM + Clean Architecture** principles.
 
 ## Project Architecture
 
@@ -8,7 +8,7 @@ This project follows a three-layer clean architecture pattern:
 
 ```
 app/
-├── src/main/kotlin/com/example/modernandroidapp/
+├── src/main/kotlin/com/example/craftnook/
 │   ├── data/                 # Data Layer
 │   │   ├── database/         # Room entities and DAOs
 │   │   ├── network/          # Retrofit API interfaces

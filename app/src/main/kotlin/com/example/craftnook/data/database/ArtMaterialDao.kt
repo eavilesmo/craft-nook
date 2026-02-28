@@ -1,4 +1,4 @@
-package com.example.modernandroidapp.data.database
+package com.example.craftnook.data.database
 
 import androidx.room.Dao
 import androidx.room.Delete
@@ -6,7 +6,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
-import com.example.modernandroidapp.data.repository.ArtMaterial
+import com.example.craftnook.data.repository.ArtMaterial
 import kotlinx.coroutines.flow.Flow
 
 /**

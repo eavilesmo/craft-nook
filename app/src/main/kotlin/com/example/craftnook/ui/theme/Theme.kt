@@ -1,7 +1,6 @@
-package com.example.modernandroidapp.ui.theme
+package com.example.craftnook.ui.theme
 
 import android.os.Build
-import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
@@ -81,7 +80,7 @@ private val DarkColorScheme = darkColorScheme(
 @Composable
 fun CraftNookTheme(
     darkTheme: Boolean = false,
-    dynamicColor: Boolean = true,
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {

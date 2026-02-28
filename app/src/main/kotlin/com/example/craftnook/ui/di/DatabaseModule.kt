@@ -1,9 +1,9 @@
-package com.example.modernandroidapp.ui.di
+package com.example.craftnook.ui.di
 
 import android.content.Context
 import androidx.room.Room
-import com.example.modernandroidapp.data.database.AppDatabase
-import com.example.modernandroidapp.data.database.ArtMaterialDao
+import com.example.craftnook.data.database.AppDatabase
+import com.example.craftnook.data.database.ArtMaterialDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -54,4 +54,5 @@ class DatabaseModule {
     fun provideArtMaterialDao(appDatabase: AppDatabase): ArtMaterialDao {
         return appDatabase.artMaterialDao()
     }
+
 }

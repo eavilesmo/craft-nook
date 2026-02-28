@@ -1,8 +1,8 @@
-package com.example.modernandroidapp.data.database
+package com.example.craftnook.data.database
 
 import androidx.room.Database
 import androidx.room.RoomDatabase
-import com.example.modernandroidapp.data.repository.ArtMaterial
+import com.example.craftnook.data.repository.ArtMaterial
 
 /**
  * Room Database for Craft Nook application

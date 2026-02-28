@@ -1,6 +1,6 @@
 # PACKAGE STRUCTURE PLAN
 
-This file documents the directory structure that will be created for the Modern Android App project.
+This file documents the directory structure that was created for the Craft Nook project.
 
 ## Complete Project Structure
 
@@ -11,8 +11,8 @@ This file documents the directory structure that will be created for the Modern 
 │   ├── src/
 │   │   ├── main/
 │   │   │   ├── AndroidManifest.xml         # [CREATED] Android app manifest
-│   │   │   ├── kotlin/com/example/modernandroidapp/
-│   │   │   │   ├── MyApplication.kt        # [TO CREATE] Hilt application class
+│   │   │   ├── kotlin/com/example/craftnook/
+│   │   │   │   ├── MyApplication.kt        # [CREATED] Hilt application class
 │   │   │   │   │
 │   │   │   │   ├── data/                   # Data Layer (Repository, Database, Network)
 │   │   │   │   │   ├── database/
@@ -101,7 +101,7 @@ This file documents the directory structure that will be created for the Modern 
 │   │   │           └── ic_launcher_round.xml
 │   │   │
 │   │   └── test/
-│   │       └── kotlin/com/example/modernandroidapp/
+│   │       └── kotlin/com/example/craftnook/
 │   │           ├── data/
 │   │           │   └── repository/
 │   │           │       └── ArticleRepositoryTest.kt

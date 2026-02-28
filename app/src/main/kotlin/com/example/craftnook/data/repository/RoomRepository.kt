@@ -1,7 +1,8 @@
-package com.example.modernandroidapp.data.repository
+package com.example.craftnook.data.repository
 
-import com.example.modernandroidapp.data.database.ArtMaterialDao
+import com.example.craftnook.data.database.ArtMaterialDao
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 
 /**
  * Room Database implementation of ArtMaterialRepository
@@ -96,16 +97,15 @@ class RoomRepository(
             // Generate unique ID (using current timestamp with random suffix)
             val newId = System.currentTimeMillis().toString()
 
-            // Create new material with sensible defaults
-            val newMaterial = ArtMaterial(
-                id = newId,
-                name = name,
-                description = brand.ifBlank { "No brand specified" },
-                category = category,
-                quantity = quantity,
-                unit = "unit", // Default unit
-                price = 0.0 // Default price (can be updated later)
-            )
+             // Create new material with sensible defaults
+             val newMaterial = ArtMaterial(
+                 id = newId,
+                 name = name,
+                 description = brand.ifBlank { "No brand specified" },
+                 category = category,
+                 quantity = quantity,
+                 unit = "unit" // Default unit
+             )
 
             // Insert into database
             artMaterialDao.insertMaterial(newMaterial)
@@ -149,4 +149,3 @@ class RoomRepository(
         }
     }
 }
-
