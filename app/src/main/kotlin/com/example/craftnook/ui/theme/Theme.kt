@@ -8,6 +8,7 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.ExperimentalTextApi
 
 /**
  * Light mode color scheme for Craft Nook.
@@ -77,6 +78,7 @@ private val DarkColorScheme = darkColorScheme(
  * @param dynamicColor Boolean indicating if dynamic colors should be used on supported devices.
  * @param content The composable content to apply the theme to.
  */
+@OptIn(ExperimentalTextApi::class)
 @Composable
 fun CraftNookTheme(
     darkTheme: Boolean = false,

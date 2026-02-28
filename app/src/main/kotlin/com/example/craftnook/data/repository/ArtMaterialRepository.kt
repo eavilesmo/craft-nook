@@ -92,14 +92,6 @@ class InMemoryArtMaterialRepository : IArtMaterialRepository {
                   unit = "bottle"
               ),
               ArtMaterial(
-                  id = "2",
-                  name = "Canvas - 8x10",
-                  description = "Blank canvas 8x10 inches",
-                  category = "Canvas",
-                  quantity = 3,
-                  unit = "piece"
-              ),
-              ArtMaterial(
                   id = "3",
                   name = "Brush Set - Professional",
                   description = "Set of 12 professional brushes",
@@ -259,14 +251,6 @@ class InMemoryArtMaterialRepository : IArtMaterialRepository {
                 category = "Paint",
                 quantity = 5,
                 unit = "bottle"
-            ),
-            ArtMaterial(
-                id = "2",
-                name = "Canvas - 8x10",
-                description = "Blank canvas 8x10 inches",
-                category = "Canvas",
-                quantity = 3,
-                unit = "piece"
             ),
             ArtMaterial(
                 id = "3",

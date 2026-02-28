@@ -39,12 +39,24 @@ class InventoryViewModel(
         val FIXED_CATEGORIES = listOf(
             "Paint",
             "Brushes",
-            "Canvas",
             "Paper",
-            "Pencils",
-            "Markers",
-            "Sketchbooks",
-            "Other"
+            "Pens",
+            "Alcohol Markers",
+            "Water-based Markers",
+            "Colored Pencils",
+            "Drawing Pencils",
+            "Mechanical Pencil Leads",
+            "Mechanical Pencils",
+            "White Pens",
+            "Glitter Pens",
+            "Metallic Pens",
+            "Crayons",
+            "Highlighters",
+            "A4 Notebooks",
+            "A5 Notebooks",
+            "Fountain Pen Cartridges",
+            "Fineliners",
+            "Erasers"
         )
     }
 

@@ -73,14 +73,26 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.craftnook.data.repository.ArtMaterial
 import com.example.craftnook.ui.components.MaterialDetailsBottomSheet
+import com.example.craftnook.ui.theme.CategoryA4NotebooksColor
+import com.example.craftnook.ui.theme.CategoryA5NotebooksColor
+import com.example.craftnook.ui.theme.CategoryAlcoholMarkersColor
 import com.example.craftnook.ui.theme.CategoryBrushesColor
-import com.example.craftnook.ui.theme.CategoryCanvasColor
-import com.example.craftnook.ui.theme.CategoryMarkersColor
-import com.example.craftnook.ui.theme.CategoryOtherColor
+import com.example.craftnook.ui.theme.CategoryColoredPencilsColor
+import com.example.craftnook.ui.theme.CategoryCrayonsColor
+import com.example.craftnook.ui.theme.CategoryDrawingPencilsColor
+import com.example.craftnook.ui.theme.CategoryErasersColor
+import com.example.craftnook.ui.theme.CategoryFinelinersColor
+import com.example.craftnook.ui.theme.CategoryFountainPenCartridgesColor
+import com.example.craftnook.ui.theme.CategoryGlitterPensColor
+import com.example.craftnook.ui.theme.CategoryHighlightersColor
+import com.example.craftnook.ui.theme.CategoryMechanicalPencilLeadsColor
+import com.example.craftnook.ui.theme.CategoryMechanicalPencilsColor
+import com.example.craftnook.ui.theme.CategoryMetallicPensColor
 import com.example.craftnook.ui.theme.CategoryPaintColor
 import com.example.craftnook.ui.theme.CategoryPaperColor
-import com.example.craftnook.ui.theme.CategoryPencilsColor
-import com.example.craftnook.ui.theme.CategorySketchbooksColor
+import com.example.craftnook.ui.theme.CategoryPensColor
+import com.example.craftnook.ui.theme.CategoryWaterbasedMarkersColor
+import com.example.craftnook.ui.theme.CategoryWhitePensColor
 import com.example.craftnook.ui.theme.OutlineLight
 import com.example.craftnook.ui.viewmodel.InventoryViewModel
 import kotlinx.coroutines.launch
@@ -146,7 +158,7 @@ fun InventoryScreen(
                 onQueryChange = { viewModel.updateSearchQuery(it) },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                    .padding(horizontal = 20.dp, vertical = 12.dp)
             )
 
             // Category filter chips
@@ -156,7 +168,7 @@ fun InventoryScreen(
                 onCategorySelected = { viewModel.selectCategory(it) },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .padding(horizontal = 20.dp, vertical = 12.dp)
             )
 
             // Materials list
@@ -257,13 +269,25 @@ private fun CategoryFilterRow(
     fun getCategoryColor(category: String): Color = when (category) {
         "Paint" -> CategoryPaintColor
         "Brushes" -> CategoryBrushesColor
-        "Canvas" -> CategoryCanvasColor
         "Paper" -> CategoryPaperColor
-        "Pencils" -> CategoryPencilsColor
-        "Markers" -> CategoryMarkersColor
-        "Sketchbooks" -> CategorySketchbooksColor
+        "Pens" -> CategoryPensColor
+        "Alcohol Markers" -> CategoryAlcoholMarkersColor
+        "Water-based Markers" -> CategoryWaterbasedMarkersColor
+        "Colored Pencils" -> CategoryColoredPencilsColor
+        "Drawing Pencils" -> CategoryDrawingPencilsColor
+        "Mechanical Pencil Leads" -> CategoryMechanicalPencilLeadsColor
+        "Mechanical Pencils" -> CategoryMechanicalPencilsColor
+        "White Pens" -> CategoryWhitePensColor
+        "Glitter Pens" -> CategoryGlitterPensColor
+        "Metallic Pens" -> CategoryMetallicPensColor
+        "Crayons" -> CategoryCrayonsColor
+        "Highlighters" -> CategoryHighlightersColor
+        "A4 Notebooks" -> CategoryA4NotebooksColor
+        "A5 Notebooks" -> CategoryA5NotebooksColor
+        "Fountain Pen Cartridges" -> CategoryFountainPenCartridgesColor
+        "Fineliners" -> CategoryFinelinersColor
         "All" -> Color(0xFFE8E8E8) // Light gray for "All"
-        else -> CategoryOtherColor
+        else -> Color(0xFFE0E0E0) // Default light gray
     }
 
     androidx.compose.foundation.lazy.LazyRow(
@@ -309,9 +333,8 @@ private fun InventoryTopAppBar(
         title = {
             Text(
                 text = "Craft Nook",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Medium,
-                letterSpacing = 0.5.sp
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold
             )
         },
         actions = {},
@@ -598,14 +621,26 @@ private fun CategoryBadge(
     val backgroundColor = when (category) {
         "Paint" -> CategoryPaintColor
         "Brushes" -> CategoryBrushesColor
-        "Canvas" -> CategoryCanvasColor
         "Paper" -> CategoryPaperColor
-        "Pencils" -> CategoryPencilsColor
-        "Markers" -> CategoryMarkersColor
-        "Sketchbooks" -> CategorySketchbooksColor
-        else -> CategoryOtherColor
-    }
-    
+        "Pens" -> CategoryPensColor
+        "Alcohol Markers" -> CategoryAlcoholMarkersColor
+        "Water-based Markers" -> CategoryWaterbasedMarkersColor
+        "Colored Pencils" -> CategoryColoredPencilsColor
+        "Drawing Pencils" -> CategoryDrawingPencilsColor
+        "Mechanical Pencil Leads" -> CategoryMechanicalPencilLeadsColor
+        "Mechanical Pencils" -> CategoryMechanicalPencilsColor
+        "White Pens" -> CategoryWhitePensColor
+        "Glitter Pens" -> CategoryGlitterPensColor
+        "Metallic Pens" -> CategoryMetallicPensColor
+        "Crayons" -> CategoryCrayonsColor
+        "Highlighters" -> CategoryHighlightersColor
+        "A4 Notebooks" -> CategoryA4NotebooksColor
+        "A5 Notebooks" -> CategoryA5NotebooksColor
+        "Fountain Pen Cartridges" -> CategoryFountainPenCartridgesColor
+        "Fineliners" -> CategoryFinelinersColor
+        "Erasers" -> CategoryErasersColor
+        else -> CategoryPaintColor
+    }    
     // Dark text for good contrast on pastels
     val textColor = Color(0xFF2D3748)
 

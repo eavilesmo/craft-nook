@@ -36,15 +36,27 @@ val ErrorContainerLight = Color(0xFFFFE3E3)
 val OnErrorContainerLight = Color(0xFF7A1C1C)
 
 // Category chips / swatches
-val CategoryPaintColor = Color(0xFFFFECB3) // Peach
-val CategoryBrushesColor = Color(0xFFDCEDC8) // Sage green
-val CategoryCanvasColor = Color(0xFFE1BEE7) // Lavender
-val CategoryPaperColor = Color(0xFFFFFDE7) // Soft yellow
+val CategoryPaintColor = Color(0xFFFFECB3) // Peach - Paint
+val CategoryBrushesColor = Color(0xFFDCEDC8) // Sage green - Brushes
+val CategoryPaperColor = Color(0xFFFFFDE7) // Soft yellow - Paper
+val CategoryPensColor = Color(0xFFFFCDD2) // Light pink - Pens
+val CategoryAlcoholMarkersColor = Color(0xFFC8E6C9) // Fresh green - Alcohol Markers
+val CategoryWaterbasedMarkersColor = Color(0xFFB3E5FC) // Sky blue - Water-based Markers
+val CategoryColoredPencilsColor = Color(0xFFFFE0B2) // Soft orange - Colored Pencils
+val CategoryDrawingPencilsColor = Color(0xFFD7CCC8) // Tan - Drawing Pencils
+val CategoryMechanicalPencilLeadsColor = Color(0xFFE0E0E0) // Light gray - Mechanical Pencil Leads
+val CategoryMechanicalPencilsColor = Color(0xFFCFD8DC) // Blue-gray - Mechanical Pencils
+val CategoryWhitePensColor = Color(0xFFF5F5F5) // Off-white - White Pens
+val CategoryGlitterPensColor = Color(0xFFF8BBD0) // Soft pink - Glitter Pens
+val CategoryMetallicPensColor = Color(0xFFFFEDB3) // Golden yellow - Metallic Pens
+val CategoryCrayonsColor = Color(0xFFE1BEE7) // Lavender - Crayons
+val CategoryHighlightersColor = Color(0xFFFFF59D) // Bright yellow - Highlighters
+val CategoryA4NotebooksColor = Color(0xFFECC8E1) // Orchid - A4 Notebooks
+val CategoryA5NotebooksColor = Color(0xFFCEE7DB) // Mint - A5 Notebooks
+val CategoryFountainPenCartridgesColor = Color(0xFFC5E1A5) // Pale lime - Fountain Pen Cartridges
+val CategoryFinelinersColor = Color(0xFFB2DFDB) // Teal - Fineliners
+val CategoryErasersColor = Color(0xFFFFCCBC)   // Soft coral - Erasers
 val CategoryAccentColor = Color(0xFF81C784) // Leaf green accent / FAB
-val CategoryPencilsColor = Color(0xFFFFE0B2) // Soft orange
-val CategoryMarkersColor = Color(0xFFC8E6C9) // Fresh green
-val CategorySketchbooksColor = Color(0xFFF8BBD0) // Soft pink
-val CategoryOtherColor = Color(0xFFB3E5FC) // Sky blue
 
 // Legacy alias for screens referencing old background name
 val BackgroundPremium = BackgroundLight
