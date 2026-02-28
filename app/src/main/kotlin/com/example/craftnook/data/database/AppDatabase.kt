@@ -1,5 +1,6 @@
 package com.example.craftnook.data.database
 
+import androidx.room.AutoMigration
 import androidx.room.Database
 import androidx.room.RoomDatabase
 import com.example.craftnook.data.repository.ArtMaterial
@@ -10,7 +11,7 @@ import com.example.craftnook.data.repository.ArtMaterial
  */
 @Database(
     entities = [ArtMaterial::class],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

@@ -84,7 +84,7 @@ class RoomRepository(
      * @param category Category of the material
      * @return Result with the created ArtMaterial on success, Exception on failure
      */
-    override suspend fun addMaterial(name: String, brand: String, quantity: Int, category: String): Result<ArtMaterial> {
+    override suspend fun addMaterial(name: String, brand: String, quantity: Int, category: String, imageUri: String?): Result<ArtMaterial> {
         return try {
             // Validate inputs
             if (name.isBlank()) {
@@ -104,7 +104,8 @@ class RoomRepository(
                  description = brand.ifBlank { "No brand specified" },
                  category = category,
                  quantity = quantity,
-                 unit = "unit" // Default unit
+                 unit = "unit", // Default unit
+                 photoUri = imageUri
              )
 
             // Insert into database

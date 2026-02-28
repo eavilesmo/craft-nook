@@ -2,6 +2,8 @@ package com.example.craftnook.ui.di
 
 import android.content.Context
 import androidx.room.Room
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.craftnook.data.database.AppDatabase
 import com.example.craftnook.data.database.ArtMaterialDao
 import dagger.Module
@@ -23,6 +25,17 @@ import javax.inject.Singleton
 class DatabaseModule {
 
     /**
+     * Migration from version 1 to 2: adds nullable photoUri column.
+     */
+    private val MIGRATION_1_2 = object : Migration(1, 2) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            database.execSQL(
+                "ALTER TABLE art_materials ADD COLUMN photoUri TEXT DEFAULT NULL"
+            )
+        }
+    }
+
+    /**
      * Provides a singleton instance of the Room AppDatabase.
      *
      * Creates the database with the specified name and persists data to device storage.
@@ -40,7 +53,9 @@ class DatabaseModule {
             context = context,
             klass = AppDatabase::class.java,
             name = AppDatabase.DATABASE_NAME
-        ).build()
+        )
+            .addMigrations(MIGRATION_1_2)
+            .build()
     }
 
     /**

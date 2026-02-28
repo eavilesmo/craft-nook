@@ -226,13 +226,13 @@ class InventoryViewModel(
      * @param category Category of the material
      * @return Result with the created ArtMaterial on success, Exception on failure
      */
-    fun addMaterial(name: String, brand: String, quantity: Int, category: String) {
+    fun addMaterial(name: String, brand: String, quantity: Int, category: String, imageUri: String? = null) {
         viewModelScope.launch {
             try {
                 _isLoading.value = true
                 _errorMessage.value = null
 
-                val result = materialRepository.addMaterial(name, brand, quantity, category)
+                val result = materialRepository.addMaterial(name, brand, quantity, category, imageUri)
                 result.onFailure { exception ->
                     _errorMessage.value = exception.message ?: "Failed to add material"
                 }

@@ -1,9 +1,9 @@
 plugins {
-    id("com.android.application") version "8.3.2"
-    kotlin("android") version "1.9.22"
-    id("com.google.dagger.hilt.android") version "2.48"
-    kotlin("kapt") version "1.9.22"
-    kotlin("plugin.serialization") version "1.9.22"
+    id("com.android.application")
+    kotlin("android")
+    id("com.google.dagger.hilt.android")
+    kotlin("kapt")
+    kotlin("plugin.serialization")
 }
 
 android {
@@ -91,6 +91,9 @@ dependencies {
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
     implementation("com.squareup.okhttp3:okhttp:4.11.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
+
+    // Image loading
+    implementation("io.coil-kt:coil-compose:2.5.0")
 
     // Testing
     testImplementation("junit:junit:4.13.2")

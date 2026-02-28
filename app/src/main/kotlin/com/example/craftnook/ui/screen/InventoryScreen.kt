@@ -1,5 +1,9 @@
 package com.example.craftnook.ui.screen
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -34,6 +38,7 @@ import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material.icons.filled.Eco
@@ -45,6 +50,7 @@ import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -56,13 +62,14 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -73,15 +80,20 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import androidx.compose.ui.platform.LocalContext
+import coil.transform.RoundedCornersTransformation
 import com.example.craftnook.data.repository.ArtMaterial
-import com.example.craftnook.ui.components.MaterialDetailsBottomSheet
 import com.example.craftnook.ui.theme.CategoryA4NotebooksColor
 import com.example.craftnook.ui.theme.CategoryA5NotebooksColor
 import com.example.craftnook.ui.theme.CategoryAlcoholMarkersColor
@@ -124,11 +136,23 @@ fun InventoryScreen(
     val availableCategories by viewModel.availableCategories.collectAsState()
     var showAddMaterialDialog by remember { mutableStateOf(false) }
     var fabPressed by remember { mutableStateOf(false) }
-    
+
     // Material details bottom sheet state
     var selectedMaterial by remember { mutableStateOf<ArtMaterial?>(null) }
-    val bottomSheetState = rememberModalBottomSheetState()
-    val coroutineScope = rememberCoroutineScope()
+
+    // ── Photo picker state ────────────────────────────────────────────────
+    // Pending URI is written by the picker launcher and consumed by whichever
+    // dialog is currently open. Using separate callbacks avoids cross-dialog
+    // state leakage.
+    var pendingAddPhotoUri by remember { mutableStateOf<String?>(null) }
+    var pendingEditPhotoUri by remember { mutableStateOf<String?>(null) }
+
+    val addPhotoPickerLauncher = rememberLauncherForActivityResult(PickVisualMedia()) { uri: Uri? ->
+        pendingAddPhotoUri = uri?.toString()
+    }
+    val editPhotoPickerLauncher = rememberLauncherForActivityResult(PickVisualMedia()) { uri: Uri? ->
+        pendingEditPhotoUri = uri?.toString()
+    }
 
     Scaffold(
         topBar = {
@@ -138,7 +162,7 @@ fun InventoryScreen(
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { 
+                onClick = {
                     fabPressed = true
                     showAddMaterialDialog = true
                 },
@@ -192,31 +216,27 @@ fun InventoryScreen(
                     materials = filteredMaterials,
                     categories = availableCategories,
                     viewModel = viewModel,
+                    onPickEditPhoto = { editPhotoPickerLauncher.launch(PickVisualMediaRequest(PickVisualMedia.ImageOnly)) },
+                    pendingEditPhotoUri = pendingEditPhotoUri,
+                    onEditPhotoUriConsumed = { pendingEditPhotoUri = null },
                     onMaterialClick = { material ->
                         selectedMaterial = material
-                        coroutineScope.launch {
-                            bottomSheetState.show()
-                        }
                     },
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
-                     .padding(bottom = 32.dp) // Extra padding to avoid FAB overlap
+                        .padding(bottom = 32.dp)
                 )
             }
         }
     }
 
-    // Material details bottom sheet
+    // Material details dialog (AlertDialog instead of bottom sheet)
     if (selectedMaterial != null) {
-            MaterialDetailsBottomSheet(
-                material = selectedMaterial!!,
-                sheetState = bottomSheetState,
-                onDismiss = {
-                    coroutineScope.launch {
-                        bottomSheetState.hide()
-                    selectedMaterial = null
-                }
+        MaterialDetailsDialog(
+            material = selectedMaterial!!,
+            onDismiss = {
+                selectedMaterial = null
             }
         )
     }
@@ -224,16 +244,22 @@ fun InventoryScreen(
     if (showAddMaterialDialog) {
         AddMaterialDialog(
             categories = InventoryViewModel.FIXED_CATEGORIES,
-            onDismiss = { 
+            photoUri = pendingAddPhotoUri,
+            onPickPhoto = {
+                addPhotoPickerLauncher.launch(PickVisualMediaRequest(PickVisualMedia.ImageOnly))
+            },
+            onDismiss = {
                 showAddMaterialDialog = false
                 fabPressed = false
+                pendingAddPhotoUri = null
             },
-            onAdd = { name, brand, quantity, category ->
+            onAdd = { name, brand, quantity, category, imageUri ->
                 quantity.toIntOrNull()?.let { quantityInt ->
-                    viewModel.addMaterial(name, brand, quantityInt, category)
+                    viewModel.addMaterial(name, brand, quantityInt, category, imageUri)
                 }
                 showAddMaterialDialog = false
                 fabPressed = false
+                pendingAddPhotoUri = null
             }
         )
     }
@@ -364,6 +390,9 @@ private fun MaterialsList(
     materials: List<ArtMaterial>,
     categories: List<String>,
     viewModel: InventoryViewModel,
+    onPickEditPhoto: () -> Unit,
+    pendingEditPhotoUri: String?,
+    onEditPhotoUriConsumed: () -> Unit,
     onMaterialClick: (ArtMaterial) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -399,7 +428,10 @@ private fun MaterialsList(
                     categories = categories,
                     onEdit = { updatedMaterial -> viewModel.updateMaterial(updatedMaterial) },
                     onDelete = { viewModel.deleteMaterial(material.id) },
-                    onClick = { onMaterialClick(material) }
+                    onClick = { onMaterialClick(material) },
+                    onPickPhoto = onPickEditPhoto,
+                    pendingPhotoUri = pendingEditPhotoUri,
+                    onPhotoUriConsumed = onEditPhotoUriConsumed
                 )
             }
         }
@@ -407,12 +439,17 @@ private fun MaterialsList(
 }
 
 /**
- * Inventory Item Card — Grid Cell
- * Compact square card for 2-column grid layout.
- * Shows category badge, material name, quantity, and action buttons
- * arranged vertically to fill a ~1:1 aspect-ratio cell.
+ * InventoryItemCard — photo-first grid cell.
  *
- * Uses Material 3 Card with large rounded corners and subtle brown border.
+ * Layout (1:1 aspect ratio card):
+ *   ┌──────────────────────────┐
+ *   │  Photo area  80%         │  ← AsyncImage or leaf placeholder
+ *   │  [Edit] overlay          │    rounded top corners (24dp)
+ *   │             [Delete]     │    action buttons sit on bottom edge of photo
+ *   ├──────────────────────────┤
+ *   │ Name (bold)  │ Category  │  ← 20% info bar
+ *   │              │ Qty       │
+ *   └──────────────────────────┘
  */
 @Composable
 private fun InventoryItemCard(
@@ -421,12 +458,17 @@ private fun InventoryItemCard(
     onEdit: (ArtMaterial) -> Unit = {},
     onDelete: () -> Unit = {},
     onClick: () -> Unit = {},
+    onPickPhoto: () -> Unit = {},
+    pendingPhotoUri: String? = null,
+    onPhotoUriConsumed: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var showDeleteConfirmation by remember { mutableStateOf(false) }
     var showEditDialog by remember { mutableStateOf(false) }
-    var editButtonPressed by remember { mutableStateOf(false) }
-    var deleteButtonPressed by remember { mutableStateOf(false) }
+
+    val cardShape = RoundedCornerShape(20.dp)
+    val photoShape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
+    val context = LocalContext.current
 
     Card(
         modifier = modifier
@@ -437,125 +479,137 @@ private fun InventoryItemCard(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null
             ),
-        shape = RoundedCornerShape(24.dp),
+        shape = cardShape,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
-        elevation = CardDefaults.cardElevation(
-            defaultElevation = 3.dp
-        ),
-        border = androidx.compose.foundation.BorderStroke(
-            width = 1.dp,
-            color = Color(0xFFD7CCC8)
-        )
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFD7CCC8))
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(14.dp),
-            verticalArrangement = Arrangement.SpaceBetween
-        ) {
-            // Top section: category badge + action buttons row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top
-            ) {
-                // Category badge (compact — icon only with tight padding)
-                CategoryBadge(
-                    category = material.category,
-                    compact = true
-                )
+        Column(modifier = Modifier.fillMaxSize()) {
 
-                // Action buttons stacked vertically to save horizontal space
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Edit button
-                    Button(
-                        onClick = {
-                            editButtonPressed = true
-                            showEditDialog = true
-                        },
+            // ── Photo area (80%) ──────────────────────────────────────────
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(0.80f)
+                    .clip(photoShape)
+            ) {
+                if (!material.photoUri.isNullOrBlank()) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(context)
+                            .data(material.photoUri)
+                            .crossfade(true)
+                            .transformations(RoundedCornersTransformation(topLeft = 20f, topRight = 20f))
+                            .build(),
+                        contentDescription = material.name,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    // Placeholder — subtle warm background + leaf icon
+                    Box(
                         modifier = Modifier
-                            .size(30.dp)
-                            .graphicsLayer {
-                                scaleX = if (editButtonPressed) 0.95f else 1f
-                                scaleY = if (editButtonPressed) 0.95f else 1f
-                            },
-                        shape = RoundedCornerShape(10.dp),
-                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary
-                        ),
-                        contentPadding = PaddingValues(0.dp)
+                            .fillMaxSize()
+                            .background(Color(0xFFF5F0EB)),
+                        contentAlignment = Alignment.Center
                     ) {
+                        Icon(
+                            imageVector = Icons.Filled.Eco,
+                            contentDescription = null,
+                            modifier = Modifier.size(36.dp),
+                            tint = Color(0xFFBCAAA4)
+                        )
+                    }
+                }
+
+                // Edit button — bottom-left overlay on photo
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(6.dp)
+                        .size(28.dp)
+                        .clickable { showEditDialog = true },
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
+                    tonalElevation = 2.dp
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
                         Icon(
                             imageVector = Icons.Filled.Edit,
                             contentDescription = "Edit material",
-                            modifier = Modifier.size(15.dp)
+                            modifier = Modifier.size(14.dp),
+                            tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
+                }
 
-                    // Delete button
-                    Button(
-                        onClick = {
-                            deleteButtonPressed = true
-                            showDeleteConfirmation = true
-                        },
-                        modifier = Modifier
-                            .size(30.dp)
-                            .border(1.dp, OutlineLight, RoundedCornerShape(10.dp))
-                            .graphicsLayer {
-                                scaleX = if (deleteButtonPressed) 0.95f else 1f
-                                scaleY = if (deleteButtonPressed) 0.95f else 1f
-                            },
-                        shape = RoundedCornerShape(10.dp),
-                        colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(
-                            contentColor = MaterialTheme.colorScheme.onSurface
-                        ),
-                        contentPadding = PaddingValues(0.dp)
-                    ) {
+                // Delete button — bottom-right overlay on photo
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(6.dp)
+                        .size(28.dp)
+                        .clickable { showDeleteConfirmation = true },
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
+                    tonalElevation = 2.dp
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
                         Icon(
                             imageVector = Icons.Outlined.Delete,
                             contentDescription = "Delete material",
-                            modifier = Modifier.size(15.dp)
+                            modifier = Modifier.size(14.dp),
+                            tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
                 }
             }
 
-            // Middle section: material name + brand
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+            // ── Info bar (20%) ────────────────────────────────────────────
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(0.20f)
+                    .background(MaterialTheme.colorScheme.surface)
+                    .padding(horizontal = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
+                // Left: material name
                 Text(
                     text = material.name,
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
                 )
-                if (material.description.isNotBlank()) {
+
+                Spacer(modifier = Modifier.width(6.dp))
+
+                // Right: category icon + quantity stacked
+                Column(
+                    horizontalAlignment = Alignment.End,
+                    verticalArrangement = Arrangement.spacedBy(1.dp)
+                ) {
+                    Icon(
+                        imageVector = getCategoryIcon(material.category),
+                        contentDescription = material.category,
+                        modifier = Modifier.size(12.dp),
+                        tint = Color(0xFF8D6E63)
+                    )
                     Text(
-                        text = material.description,
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.Medium,
+                        text = "${material.quantity} ${material.unit}",
+                        style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 9.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
             }
-
-            // Bottom section: quantity
-            QuantityInfo(
-                quantity = material.quantity,
-                unit = material.unit
-            )
         }
     }
 
@@ -564,14 +618,16 @@ private fun InventoryItemCard(
         EditMaterialDialog(
             material = material,
             categories = categories,
+            photoUri = pendingPhotoUri ?: material.photoUri,
+            onPickPhoto = onPickPhoto,
             onDismiss = {
                 showEditDialog = false
-                editButtonPressed = false
+                onPhotoUriConsumed()
             },
             onSave = { updatedMaterial ->
                 onEdit(updatedMaterial)
                 showEditDialog = false
-                editButtonPressed = false
+                onPhotoUriConsumed()
             }
         )
     }
@@ -579,32 +635,17 @@ private fun InventoryItemCard(
     // Delete confirmation dialog
     if (showDeleteConfirmation) {
         AlertDialog(
-            onDismissRequest = {
-                showDeleteConfirmation = false
-                deleteButtonPressed = false
-            },
-            title = {
-                Text("Delete Material")
-            },
-            text = {
-                Text("Are you sure you want to delete \"${material.name}\"? This action cannot be undone.")
-            },
+            onDismissRequest = { showDeleteConfirmation = false },
+            title = { Text("Delete Material") },
+            text = { Text("Are you sure you want to delete \"${material.name}\"? This action cannot be undone.") },
             confirmButton = {
-                Button(
-                    onClick = {
-                        onDelete()
-                        showDeleteConfirmation = false
-                        deleteButtonPressed = false
-                    }
-                ) {
-                    Text("Delete")
-                }
+                Button(onClick = {
+                    onDelete()
+                    showDeleteConfirmation = false
+                }) { Text("Delete") }
             },
             dismissButton = {
-                TextButton(onClick = {
-                    showDeleteConfirmation = false
-                    deleteButtonPressed = false
-                }) {
+                TextButton(onClick = { showDeleteConfirmation = false }) {
                     Text("Cancel")
                 }
             }
@@ -863,20 +904,23 @@ private fun EmptySearchState(
  * Material 3 dialog for adding new materials to the inventory
  * Includes validation for Name and Quantity fields
  * Allows category selection from fixed dropdown
- * Features smooth fade-in and scale animation on dialog appearance
+ * Allows gallery photo selection via system photo picker
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AddMaterialDialog(
     categories: List<String>,
+    photoUri: String?,
+    onPickPhoto: () -> Unit,
     onDismiss: () -> Unit,
-    onAdd: (name: String, brand: String, quantity: String, category: String) -> Unit
+    onAdd: (name: String, brand: String, quantity: String, category: String, imageUri: String?) -> Unit
 ) {
     var name by remember { mutableStateOf("") }
     var brand by remember { mutableStateOf("") }
     var quantity by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf(categories[0]) }
     var categoryDropdownExpanded by remember { mutableStateOf(false) }
+    val context = LocalContext.current
 
     // Validation: name and quantity must be non-empty, category must be selected
     val isValid = name.isNotBlank() && quantity.isNotBlank() && quantity.toIntOrNull() != null && quantity.toIntOrNull()!! > 0
@@ -896,6 +940,41 @@ private fun AddMaterialDialog(
                     .fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                // ── Add Photo button ──────────────────────────────────────
+                OutlinedButton(
+                    onClick = onPickPhoto,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.AddPhotoAlternate,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (photoUri != null) "Photo selected" else "Add Photo",
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+
+                // Thumbnail preview if a photo was picked
+                if (!photoUri.isNullOrBlank()) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(context)
+                            .data(photoUri)
+                            .crossfade(true)
+                            .transformations(RoundedCornersTransformation(16f))
+                            .build(),
+                        contentDescription = "Selected photo",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(120.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                    )
+                }
+
                 // Name field
                 OutlinedTextField(
                     value = name,
@@ -934,7 +1013,7 @@ private fun AddMaterialDialog(
                             )
                         }
                     )
-                    
+
                     DropdownMenu(
                         expanded = categoryDropdownExpanded,
                         onDismissRequest = { categoryDropdownExpanded = false },
@@ -957,7 +1036,7 @@ private fun AddMaterialDialog(
                         modifier = Modifier
                             .matchParentSize()
                             .alpha(0f),
-                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                        colors = ButtonDefaults.buttonColors(
                             containerColor = Color.Transparent
                         )
                     ) {}
@@ -982,7 +1061,7 @@ private fun AddMaterialDialog(
         },
         confirmButton = {
             Button(
-                onClick = { onAdd(name, brand, quantity, selectedCategory) },
+                onClick = { onAdd(name, brand, quantity, selectedCategory, photoUri) },
                 enabled = isValid
             ) {
                 Text("Add")
@@ -1000,12 +1079,15 @@ private fun AddMaterialDialog(
  * Edit Material Dialog
  * Material 3 dialog for editing existing materials in the inventory
  * Uses a numeric stepper for quantity and proper dropdowns for category/unit
+ * Allows gallery photo selection via system photo picker
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun EditMaterialDialog(
     material: ArtMaterial,
     categories: List<String>,
+    photoUri: String?,
+    onPickPhoto: () -> Unit,
     onDismiss: () -> Unit,
     onSave: (ArtMaterial) -> Unit
 ) {
@@ -1015,6 +1097,10 @@ private fun EditMaterialDialog(
     var category by remember { mutableStateOf(material.category) }
     var unit by remember { mutableStateOf(material.unit) }
     var categoryDropdownExpanded by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+
+    // photoUri from the parent (picker result) takes priority over the stored one
+    val displayPhotoUri = photoUri ?: material.photoUri
 
     val isValid = name.isNotBlank()
 
@@ -1029,6 +1115,41 @@ private fun EditMaterialDialog(
                     .fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                // ── Add / Change Photo button ─────────────────────────────
+                OutlinedButton(
+                    onClick = onPickPhoto,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.AddPhotoAlternate,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (!displayPhotoUri.isNullOrBlank()) "Change Photo" else "Add Photo",
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+
+                // Thumbnail preview
+                if (!displayPhotoUri.isNullOrBlank()) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(context)
+                            .data(displayPhotoUri)
+                            .crossfade(true)
+                            .transformations(RoundedCornersTransformation(16f))
+                            .build(),
+                        contentDescription = "Selected photo",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(120.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                    )
+                }
+
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
@@ -1081,7 +1202,7 @@ private fun EditMaterialDialog(
                         modifier = Modifier
                             .matchParentSize()
                             .alpha(0f),
-                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                        colors = ButtonDefaults.buttonColors(
                             containerColor = Color.Transparent
                         )
                     ) {}
@@ -1172,7 +1293,8 @@ private fun EditMaterialDialog(
                         description = brand,
                         quantity = quantity,
                         category = category,
-                        unit = unit
+                        unit = unit,
+                        photoUri = displayPhotoUri
                     )
                     onSave(updatedMaterial)
                 },
@@ -1184,6 +1306,118 @@ private fun EditMaterialDialog(
         dismissButton = {
             TextButton(onClick = onDismiss) {
                 Text("Cancel")
+            }
+        }
+    )
+}
+
+/**
+ * Material Details Dialog
+ * Displays material information in a popup dialog instead of a bottom sheet
+ */
+@Composable
+private fun MaterialDetailsDialog(
+    material: ArtMaterial,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = material.name,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                // Description
+                if (material.description.isNotBlank()) {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = "Description",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = material.description,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+
+                // Current Stock
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = "Current Stock",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Box(
+                        modifier = Modifier
+                            .background(
+                                color = Color(0xFFE3F2FD),
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = "${material.quantity} ${material.unit}",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xFF0D47A1)
+                        )
+                    }
+                }
+
+                // Category
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = "Category",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = material.category,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+
+                // Unit
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = "Unit",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = material.unit,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = onDismiss) {
+                Text("Close")
             }
         }
     )
