@@ -4,8 +4,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.Inventory2
+import androidx.compose.material.icons.outlined.MenuBook
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -24,15 +26,14 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.craftnook.ui.screen.InventoryScreen
+import com.example.craftnook.ui.screen.JournalScreen
 import com.example.craftnook.ui.screen.StatsScreen
 import com.example.craftnook.ui.theme.OnBackgroundLight
 import com.example.craftnook.ui.theme.PrimaryContainerLight
 import com.example.craftnook.ui.theme.PrimaryLight
 import com.example.craftnook.ui.viewmodel.InventoryViewModel
 
-/**
- * Sealed class defining all navigation routes in the Craft Nook application.
- */
+/** All navigation routes in the Craft Nook application. */
 sealed class CraftNookRoute(
     val route: String,
     val label: String,
@@ -51,20 +52,23 @@ sealed class CraftNookRoute(
         selectedIcon   = Icons.Filled.BarChart,
         unselectedIcon = Icons.Outlined.BarChart
     )
+    data object Journal : CraftNookRoute(
+        route          = "journal",
+        label          = "Journal",
+        selectedIcon   = Icons.Filled.MenuBook,
+        unselectedIcon = Icons.Outlined.MenuBook
+    )
 }
 
 private val bottomNavItems = listOf(
     CraftNookRoute.Inventory,
-    CraftNookRoute.Stats
+    CraftNookRoute.Stats,
+    CraftNookRoute.Journal
 )
 
 /**
- * Main navigation graph for the Craft Nook application.
- *
- * Hosts a bottom navigation bar with two tabs: Inventory and Stats.
- *
- * @param navController The NavHostController for managing navigation between destinations.
- * @param viewModel The InventoryViewModel shared across screens.
+ * Main navigation graph with a three-tab bottom navigation bar:
+ * Inventory · Stats · Journal (Usage Journal).
  */
 @Composable
 fun AppNavigation(
@@ -76,11 +80,10 @@ fun AppNavigation(
 
     Scaffold(
         bottomBar = {
-            NavigationBar(
-                containerColor = PrimaryContainerLight
-            ) {
+            NavigationBar(containerColor = PrimaryContainerLight) {
                 bottomNavItems.forEach { item ->
-                    val selected = currentDestination?.hierarchy?.any { it.route == item.route } == true
+                    val selected =
+                        currentDestination?.hierarchy?.any { it.route == item.route } == true
                     NavigationBarItem(
                         selected = selected,
                         onClick  = {
@@ -98,7 +101,7 @@ fun AppNavigation(
                                 contentDescription = item.label
                             )
                         },
-                        label = { Text(item.label) },
+                        label  = { Text(item.label) },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor   = PrimaryLight,
                             selectedTextColor   = PrimaryLight,
@@ -121,6 +124,9 @@ fun AppNavigation(
             }
             composable(CraftNookRoute.Stats.route) {
                 StatsScreen(viewModel = viewModel)
+            }
+            composable(CraftNookRoute.Journal.route) {
+                JournalScreen(viewModel = viewModel)
             }
         }
     }

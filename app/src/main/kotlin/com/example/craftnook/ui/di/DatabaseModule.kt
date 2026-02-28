@@ -6,6 +6,7 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.craftnook.data.database.AppDatabase
 import com.example.craftnook.data.database.ArtMaterialDao
+import com.example.craftnook.data.database.UsageLogDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -18,15 +19,12 @@ import javax.inject.Singleton
  *
  * Provides singleton instances of the Room database and DAOs.
  * The database is created once and reused throughout the application lifetime.
- * Data persists even after the app is closed.
  */
 @Module
 @InstallIn(SingletonComponent::class)
 class DatabaseModule {
 
-    /**
-     * Migration from version 1 to 2: adds nullable photoUri column.
-     */
+    /** v1 → v2: adds nullable photoUri column to art_materials. */
     private val MIGRATION_1_2 = object : Migration(1, 2) {
         override fun migrate(database: SupportSQLiteDatabase) {
             database.execSQL(
@@ -35,15 +33,26 @@ class DatabaseModule {
         }
     }
 
-    /**
-     * Provides a singleton instance of the Room AppDatabase.
-     *
-     * Creates the database with the specified name and persists data to device storage.
-     * All queries are executed on a background thread automatically.
-     *
-     * @param context Application context for database creation
-     * @return The Room AppDatabase instance
-     */
+    /** v2 → v3: creates the usage_logs table. */
+    private val MIGRATION_2_3 = object : Migration(2, 3) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            database.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS usage_logs (
+                    id TEXT NOT NULL PRIMARY KEY,
+                    materialId TEXT NOT NULL,
+                    materialName TEXT NOT NULL,
+                    category TEXT NOT NULL,
+                    eventType TEXT NOT NULL,
+                    quantityDelta INTEGER NOT NULL,
+                    quantityAfter INTEGER NOT NULL,
+                    timestamp INTEGER NOT NULL
+                )
+                """.trimIndent()
+            )
+        }
+    }
+
     @Provides
     @Singleton
     fun provideAppDatabase(
@@ -54,20 +63,19 @@ class DatabaseModule {
             klass = AppDatabase::class.java,
             name = AppDatabase.DATABASE_NAME
         )
-            .addMigrations(MIGRATION_1_2)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
             .build()
     }
 
-    /**
-     * Provides the ArtMaterialDao from the database.
-     *
-     * @param appDatabase The Room AppDatabase instance
-     * @return The ArtMaterialDao for database operations
-     */
     @Provides
     @Singleton
     fun provideArtMaterialDao(appDatabase: AppDatabase): ArtMaterialDao {
         return appDatabase.artMaterialDao()
     }
 
+    @Provides
+    @Singleton
+    fun provideUsageLogDao(appDatabase: AppDatabase): UsageLogDao {
+        return appDatabase.usageLogDao()
+    }
 }

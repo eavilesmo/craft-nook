@@ -2,21 +2,28 @@ package com.example.craftnook.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.craftnook.data.database.EventType
+import com.example.craftnook.data.database.UsageLog
 import com.example.craftnook.data.repository.ArtMaterial
 import com.example.craftnook.data.repository.IArtMaterialRepository
-import com.example.craftnook.data.repository.InMemoryArtMaterialRepository
+import com.example.craftnook.data.repository.IUsageLogRepository
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import java.time.LocalDateTime
+import java.util.UUID
+import javax.inject.Inject
 
-/**
- * Data class representing statistics for a category
- */
+// ── Supporting data classes ──────────────────────────────────────────────────
+
+/** Per-category statistics used by the Stats screen. */
 data class CategoryStat(
     val category: String,
     val count: Int,
@@ -24,18 +31,33 @@ data class CategoryStat(
 )
 
 /**
- * ViewModel for inventory management
- * Handles state management and business logic for the inventory screen
+ * Holds context for a pending quantity-reduction edit so the UI can ask
+ * "Did you use this material, or are you correcting a mistake?" before
+ * committing the log entry.
  */
-class InventoryViewModel(
-    private val materialRepository: IArtMaterialRepository = InMemoryArtMaterialRepository()
+data class PendingQuantityConfirmation(
+    val material: ArtMaterial,
+    val oldQuantity: Int,
+    val newQuantity: Int
+)
+
+// ── ViewModel ────────────────────────────────────────────────────────────────
+
+/**
+ * ViewModel for inventory management and usage journal.
+ *
+ * All mutating actions (add / update / delete) automatically write a
+ * [UsageLog] entry. When an edit reduces quantity the ViewModel surfaces a
+ * [PendingQuantityConfirmation] event so the UI can ask the user whether
+ * the reduction represents real usage or just a correction.
+ */
+@HiltViewModel
+class InventoryViewModel @Inject constructor(
+    private val materialRepository: IArtMaterialRepository,
+    private val logRepository: IUsageLogRepository
 ) : ViewModel() {
 
     companion object {
-        /**
-         * Fixed list of available categories
-         * Users can only assign materials to these categories
-         */
         val FIXED_CATEGORIES = listOf(
             "Paint",
             "Brushes",
@@ -60,49 +82,29 @@ class InventoryViewModel(
         )
     }
 
-    /**
-     * StateFlow containing all art materials
-     * Updated reactively when repository data changes
-     */
+    // ── Inventory state ──────────────────────────────────────────────────────
+
     val allMaterials: StateFlow<List<ArtMaterial>> = materialRepository.getAllMaterials()
         .stateIn(
             scope = viewModelScope,
-            started = kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000),
+            started = SharingStarted.WhileSubscribed(5000),
             initialValue = emptyList()
         )
 
-    /**
-     * Search query state
-     * Updates in real-time as user types
-     */
-    private val _searchQuery = kotlinx.coroutines.flow.MutableStateFlow("")
+    private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
-    /**
-     * Selected category filter
-     * "All" means no category filtering
-     */
-    private val _selectedCategory = kotlinx.coroutines.flow.MutableStateFlow("All")
+    private val _selectedCategory = MutableStateFlow("All")
     val selectedCategory: StateFlow<String> = _selectedCategory.asStateFlow()
 
-    /**
-     * All available categories extracted from materials
-     * Used to populate filter chip options
-     */
     val availableCategories: StateFlow<List<String>> = allMaterials
-        .combine(_searchQuery) { _, _ ->
-            FIXED_CATEGORIES
-        }
+        .combine(_searchQuery) { _, _ -> FIXED_CATEGORIES }
         .stateIn(
             scope = viewModelScope,
-            started = kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000),
+            started = SharingStarted.WhileSubscribed(5000),
             initialValue = FIXED_CATEGORIES
         )
 
-    /**
-     * Filtered materials based on search query and selected category
-     * Updates instantly as user types or selects a category
-     */
     val filteredMaterials: StateFlow<List<ArtMaterial>> = allMaterials
         .combine(_searchQuery) { materials, query ->
             materials.filter { material ->
@@ -111,25 +113,17 @@ class InventoryViewModel(
             }
         }
         .combine(_selectedCategory) { searchResults, category ->
-            if (category == "All") {
-                searchResults
-            } else {
-                searchResults.filter { it.category == category }
-            }
+            if (category == "All") searchResults
+            else searchResults.filter { it.category == category }
         }
         .stateIn(
             scope = viewModelScope,
-            started = kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000),
+            started = SharingStarted.WhileSubscribed(5000),
             initialValue = emptyList()
         )
 
-    /**
-     * Category statistics showing count and percentage for each category
-     * Automatically updates whenever allMaterials changes
-     * Only includes categories that have at least one material
-     */
     val categoryStats: StateFlow<List<CategoryStat>> = allMaterials
-        .combine(kotlinx.coroutines.flow.flowOf(Unit)) { materials, _ ->
+        .combine(flowOf(Unit)) { materials, _ ->
             val totalCount = materials.size
             if (totalCount == 0) {
                 emptyList()
@@ -137,8 +131,7 @@ class InventoryViewModel(
                 FIXED_CATEGORIES
                     .map { category ->
                         val count = materials.count { it.category == category }
-                        val percentage = (count.toFloat() / totalCount) * 100f
-                        CategoryStat(category, count, percentage)
+                        CategoryStat(category, count, (count.toFloat() / totalCount) * 100f)
                     }
                     .filter { it.count > 0 }
                     .sortedByDescending { it.count }
@@ -146,41 +139,188 @@ class InventoryViewModel(
         }
         .stateIn(
             scope = viewModelScope,
-            started = kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000),
+            started = SharingStarted.WhileSubscribed(5000),
             initialValue = emptyList()
         )
 
-    /**
-     * Loading state indicator
-     * Can be used for showing/hiding loading indicators
-     */
-     private val _isLoading = kotlinx.coroutines.flow.MutableStateFlow(false)
-     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+    // ── Journal / log state ──────────────────────────────────────────────────
+
+    /** All journal entries, newest first. */
+    val logEntries: StateFlow<List<UsageLog>> =
+        logRepository.getAllLogs()
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = emptyList()
+            )
 
     /**
-     * Error message state
-     * Set when operations fail
+     * Set when a quantity-reducing edit is saved. The UI observes this to
+     * show the "Did you use this / Just correcting?" dialog.
+     * Cleared by [confirmQuantityChange].
      */
-    private val _errorMessage = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
+    private val _pendingQuantityConfirmation = MutableStateFlow<PendingQuantityConfirmation?>(null)
+    val pendingQuantityConfirmation: StateFlow<PendingQuantityConfirmation?> =
+        _pendingQuantityConfirmation.asStateFlow()
+
+    // ── Loading / error state ────────────────────────────────────────────────
+
+    private val _isLoading = MutableStateFlow(false)
+    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
+    private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
+    // ── Public actions ───────────────────────────────────────────────────────
+
+    fun updateSearchQuery(query: String) { _searchQuery.value = query }
+
+    fun selectCategory(category: String) { _selectedCategory.value = category }
+
+    fun clearError() { _errorMessage.value = null }
+
     /**
-     * Update the quantity of a material
-     * Triggers a coroutine to update the repository
-     *
-     * @param materialId ID of the material to update
-     * @param newQuantity New quantity value
+     * Add a new material and write an ADDED log entry.
      */
+    fun addMaterial(
+        name: String,
+        brand: String,
+        quantity: Int,
+        category: String,
+        imageUri: String? = null
+    ) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            _errorMessage.value = null
+            try {
+                val result = materialRepository.addMaterial(name, brand, quantity, category, imageUri)
+                result.onSuccess { material ->
+                    writeLog(
+                        material     = material,
+                        eventType    = EventType.ADDED,
+                        delta        = material.quantity,
+                        qtyAfter     = material.quantity
+                    )
+                }
+                result.onFailure { _errorMessage.value = it.message ?: "Failed to add material" }
+            } catch (e: Exception) {
+                _errorMessage.value = e.message ?: "An unexpected error occurred"
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    /**
+     * Delete a material and write a DELETED log entry capturing the final quantity.
+     */
+    fun deleteMaterial(materialId: String) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            _errorMessage.value = null
+            try {
+                // Snapshot material before deletion so we can log name/qty
+                val snapshot = allMaterials.value.firstOrNull { it.id == materialId }
+
+                val result = materialRepository.deleteMaterial(materialId)
+                result.onSuccess {
+                    if (snapshot != null) {
+                        writeLog(
+                            material  = snapshot,
+                            eventType = EventType.DELETED,
+                            delta     = -snapshot.quantity,
+                            qtyAfter  = 0
+                        )
+                    }
+                }
+                result.onFailure { _errorMessage.value = it.message ?: "Failed to delete material" }
+            } catch (e: Exception) {
+                _errorMessage.value = e.message ?: "An unexpected error occurred"
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    /**
+     * Update a material.
+     *
+     * - If quantity increased → write RESTOCKED automatically.
+     * - If quantity decreased → surface [PendingQuantityConfirmation] so the UI
+     *   can ask the user whether this was real usage or a correction.
+     * - If quantity unchanged → no log entry.
+     * - Other field changes (name, brand, photo…) also produce no log entry.
+     */
+    fun updateMaterial(material: ArtMaterial) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            _errorMessage.value = null
+            try {
+                val oldQty = allMaterials.value
+                    .firstOrNull { it.id == material.id }
+                    ?.quantity ?: material.quantity
+
+                val result = materialRepository.updateMaterial(material)
+                result.onSuccess {
+                    val delta = material.quantity - oldQty
+                    when {
+                        delta > 0 -> writeLog(
+                            material  = material,
+                            eventType = EventType.RESTOCKED,
+                            delta     = delta,
+                            qtyAfter  = material.quantity
+                        )
+                        delta < 0 -> {
+                            // Ask user: used or correction?
+                            _pendingQuantityConfirmation.value = PendingQuantityConfirmation(
+                                material    = material,
+                                oldQuantity = oldQty,
+                                newQuantity = material.quantity
+                            )
+                        }
+                        // delta == 0 → no log entry needed
+                    }
+                }
+                result.onFailure { _errorMessage.value = it.message ?: "Failed to update material" }
+            } catch (e: Exception) {
+                _errorMessage.value = e.message ?: "An unexpected error occurred"
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    /**
+     * Called by the UI dialog after the user answers "Did you use this?"
+     *
+     * @param wasUsed true → USED event; false → RESTOCKED (correction) event.
+     */
+    fun confirmQuantityChange(wasUsed: Boolean) {
+        val pending = _pendingQuantityConfirmation.value ?: return
+        _pendingQuantityConfirmation.value = null
+        viewModelScope.launch {
+            val delta = pending.newQuantity - pending.oldQuantity  // negative
+            writeLog(
+                material  = pending.material,
+                eventType = if (wasUsed) EventType.USED else EventType.RESTOCKED,
+                delta     = delta,
+                qtyAfter  = pending.newQuantity
+            )
+        }
+    }
+
+    /** Dismiss the confirmation dialog without writing any log entry. */
+    fun dismissQuantityConfirmation() {
+        _pendingQuantityConfirmation.value = null
+    }
+
     fun updateMaterialQuantity(materialId: String, newQuantity: Int) {
         viewModelScope.launch {
+            _isLoading.value = true
+            _errorMessage.value = null
             try {
-                _isLoading.value = true
-                _errorMessage.value = null
-
                 val result = materialRepository.updateQuantity(materialId, newQuantity)
-                result.onFailure { exception ->
-                    _errorMessage.value = exception.message ?: "Failed to update quantity"
-                }
+                result.onFailure { _errorMessage.value = it.message ?: "Failed to update quantity" }
             } catch (e: Exception) {
                 _errorMessage.value = e.message ?: "An unexpected error occurred"
             } finally {
@@ -189,125 +329,27 @@ class InventoryViewModel(
         }
     }
 
-    /**
-     * Clear any error messages
-     */
-    fun clearError() {
-        _errorMessage.value = null
-    }
+    /** Stub — no usage log table required for this flow. */
+    fun getUsageLogs(materialId: String): Flow<List<Nothing>> = emptyFlow()
 
-    /**
-     * Update the search query
-     * Filters materials by name and description in real-time
-     *
-     * @param query Search query string
-     */
-    fun updateSearchQuery(query: String) {
-        _searchQuery.value = query
-    }
+    // ── Private helpers ──────────────────────────────────────────────────────
 
-    /**
-     * Select a category filter
-     * Updates the filtered materials list instantly
-     *
-     * @param category Category name or "All" for no filter
-     */
-    fun selectCategory(category: String) {
-        _selectedCategory.value = category
-    }
-
-    /**
-     * Add a new material to the inventory
-     * Triggers a coroutine to add the material to the repository
-     *
-     * @param name Name of the material
-     * @param brand Brand or manufacturer name
-     * @param quantity Initial quantity
-     * @param category Category of the material
-     * @return Result with the created ArtMaterial on success, Exception on failure
-     */
-    fun addMaterial(name: String, brand: String, quantity: Int, category: String, imageUri: String? = null) {
-        viewModelScope.launch {
-            try {
-                _isLoading.value = true
-                _errorMessage.value = null
-
-                val result = materialRepository.addMaterial(name, brand, quantity, category, imageUri)
-                result.onFailure { exception ->
-                    _errorMessage.value = exception.message ?: "Failed to add material"
-                }
-            } catch (e: Exception) {
-                _errorMessage.value = e.message ?: "An unexpected error occurred"
-            } finally {
-                _isLoading.value = false
-            }
-        }
-    }
-
-    /**
-     * Delete a material from the inventory
-     * Triggers a coroutine to delete the material from the repository
-     *
-     * @param materialId ID of the material to delete
-     */
-     /**
-      * Delete a material from the inventory
-      * Creates a final UsageLog entry for remaining stock before deletion
-      * Triggers a coroutine to delete the material from the repository
-      *
-      * @param materialId ID of the material to delete
-      */
-      fun deleteMaterial(materialId: String) {
-          viewModelScope.launch {
-              try {
-                  _isLoading.value = true
-                  _errorMessage.value = null
-
-                  val result = materialRepository.deleteMaterial(materialId)
-                  result.onFailure { exception ->
-                      _errorMessage.value = exception.message ?: "Failed to delete material"
-                  }
-              } catch (e: Exception) {
-                  _errorMessage.value = e.message ?: "An unexpected error occurred"
-              } finally {
-                  _isLoading.value = false
-              }
-          }
-      }
-
-      /**
-       * Update an existing material in the inventory
-       * Triggers a coroutine to update the material in the repository
-       * Automatically logs the quantity change if there is one
-       *
-       * @param material The updated material
-       */
-      fun updateMaterial(material: ArtMaterial) {
-          viewModelScope.launch {
-              try {
-                  _isLoading.value = true
-                  _errorMessage.value = null
-
-                  val result = materialRepository.updateMaterial(material)
-                  result.onFailure { exception ->
-                      _errorMessage.value = exception.message ?: "Failed to update material"
-                  }
-              } catch (e: Exception) {
-                  _errorMessage.value = e.message ?: "An unexpected error occurred"
-              } finally {
-                  _isLoading.value = false
-              }
-          }
-      }
-
-    /**
-     * Get usage logs for a specific material
-     * Returns a Flow of usage logs ordered by timestamp (newest first)
-     *
-     * @param materialId ID of the material
-     * @return Flow of usage logs, or empty flow if repository is not available
-     */
-    fun getUsageLogs(materialId: String): Flow<List<Nothing>> {
-        return kotlinx.coroutines.flow.emptyFlow()
+    private suspend fun writeLog(
+        material: ArtMaterial,
+        eventType: String,
+        delta: Int,
+        qtyAfter: Int
+    ) {
+        logRepository.insertLog(
+            UsageLog(
+                id            = UUID.randomUUID().toString(),
+                materialId    = material.id,
+                materialName  = material.name,
+                category      = material.category,
+                eventType     = eventType,
+                quantityDelta = delta,
+                quantityAfter = qtyAfter
+            )
+        )
     }
 }

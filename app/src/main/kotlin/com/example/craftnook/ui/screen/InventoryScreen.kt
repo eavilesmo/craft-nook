@@ -116,6 +116,7 @@ import com.example.craftnook.ui.theme.CategoryWaterbasedMarkersColor
 import com.example.craftnook.ui.theme.CategoryWhitePensColor
 import com.example.craftnook.ui.theme.OutlineLight
 import com.example.craftnook.ui.viewmodel.InventoryViewModel
+import com.example.craftnook.ui.viewmodel.PendingQuantityConfirmation
 import kotlinx.coroutines.launch
 
 /**
@@ -134,6 +135,7 @@ fun InventoryScreen(
     val searchQuery by viewModel.searchQuery.collectAsState()
     val selectedCategory by viewModel.selectedCategory.collectAsState()
     val availableCategories by viewModel.availableCategories.collectAsState()
+    val pendingConfirmation by viewModel.pendingQuantityConfirmation.collectAsState()
     var showAddMaterialDialog by remember { mutableStateOf(false) }
     var fabPressed by remember { mutableStateOf(false) }
 
@@ -261,6 +263,16 @@ fun InventoryScreen(
                 fabPressed = false
                 pendingAddPhotoUri = null
             }
+        )
+    }
+
+    // "Used it / Just correcting?" dialog — shown when a quantity is reduced during edit
+    if (pendingConfirmation != null) {
+        QuantityReductionDialog(
+            confirmation = pendingConfirmation!!,
+            onUsed       = { viewModel.confirmQuantityChange(wasUsed = true) },
+            onCorrection = { viewModel.confirmQuantityChange(wasUsed = false) },
+            onDismiss    = { viewModel.dismissQuantityConfirmation() }
         )
     }
 }
@@ -1418,6 +1430,50 @@ private fun MaterialDetailsDialog(
         confirmButton = {
             Button(onClick = onDismiss) {
                 Text("Close")
+            }
+        }
+    )
+}
+
+/**
+ * Dialog shown when the user saves an edit that reduces quantity.
+ * Asks whether the reduction represents real usage or a data correction.
+ */
+@Composable
+private fun QuantityReductionDialog(
+    confirmation: PendingQuantityConfirmation,
+    onUsed: () -> Unit,
+    onCorrection: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val delta = confirmation.oldQuantity - confirmation.newQuantity  // positive number
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Quantity reduced") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = "\"${confirmation.material.name}\" went from " +
+                           "${confirmation.oldQuantity} → ${confirmation.newQuantity} " +
+                           "(-$delta ${confirmation.material.unit}).",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = "Did you use this material, or are you correcting a mistake?",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        },
+        confirmButton = {
+            Button(onClick = onUsed) {
+                Text("Used it")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onCorrection) {
+                Text("Just correcting")
             }
         }
     )
