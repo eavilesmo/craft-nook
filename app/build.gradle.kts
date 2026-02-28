@@ -1,5 +1,5 @@
 plugins {
-    id("com.android.application") version "8.13.2"
+    id("com.android.application") version "8.3.2"
     kotlin("android") version "1.9.22"
     id("com.google.dagger.hilt.android") version "2.48"
     kotlin("kapt") version "1.9.22"
@@ -101,7 +101,7 @@ dependencies {
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
     androidTestImplementation("androidx.compose.ui:ui-test-junit4:1.5.4")
-    androidTestImplementation("com.google.dagger:hilt-android-testing:2.50")
+    androidTestImplementation("com.google.dagger:hilt-android-testing:2.48")
 
     // Debugging
     debugImplementation("androidx.compose.ui:ui-tooling:1.5.4")

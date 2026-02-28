@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -27,12 +28,19 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Brush
+import androidx.compose.material.icons.filled.Eco
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.Highlight
+import androidx.compose.material.icons.filled.Note
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.AlertDialog
@@ -69,6 +77,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.craftnook.data.repository.ArtMaterial
@@ -346,8 +355,8 @@ private fun InventoryTopAppBar(
 }
 
 /**
- * Materials List
- * Displays all materials in a LazyColumn with proper spacing
+ * Materials Grid
+ * Displays all materials in a 2-column LazyVerticalGrid with airy spacing
  * Includes staggered fade-in animations for smooth visual feedback
  */
 @Composable
@@ -358,12 +367,14 @@ private fun MaterialsList(
     onMaterialClick: (ArtMaterial) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    LazyColumn(
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(2),
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp)
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        items(
+        gridItems(
             items = materials,
             key = { material -> material.id }
         ) { material ->
@@ -396,12 +407,12 @@ private fun MaterialsList(
 }
 
 /**
- * Inventory Item Card
- * Shows individual art material details with edit and delete buttons
- * Includes scale and fade animations on button press
- * Clickable to open material details bottom sheet
+ * Inventory Item Card — Grid Cell
+ * Compact square card for 2-column grid layout.
+ * Shows category badge, material name, quantity, and action buttons
+ * arranged vertically to fill a ~1:1 aspect-ratio cell.
  *
- * Uses Material 3 Card component
+ * Uses Material 3 Card with large rounded corners and subtle brown border.
  */
 @Composable
 private fun InventoryItemCard(
@@ -419,7 +430,7 @@ private fun InventoryItemCard(
 
     Card(
         modifier = modifier
-            .fillMaxWidth()
+            .aspectRatio(1f)
             .clickable(
                 enabled = true,
                 onClick = onClick,
@@ -431,57 +442,44 @@ private fun InventoryItemCard(
             containerColor = MaterialTheme.colorScheme.surface
         ),
         elevation = CardDefaults.cardElevation(
-            defaultElevation = 1.dp
+            defaultElevation = 3.dp
         ),
         border = androidx.compose.foundation.BorderStroke(
             width = 1.dp,
-            color = OutlineLight
+            color = Color(0xFFD7CCC8)
         )
     ) {
         Column(
-            modifier = Modifier.padding(24.dp)
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(14.dp),
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // Header row with name
+            // Top section: category badge + action buttons row
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.Top
             ) {
-                // Material Name - Now Bigger & More Prominent
-                Column(
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text(
-                        text = material.name,
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 2
-                    )
-                    if (material.description.isNotBlank()) {
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = material.description,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1
-                        )
-                    }
-                }
+                // Category badge (compact — icon only with tight padding)
+                CategoryBadge(
+                    category = material.category,
+                    compact = true
+                )
 
-                // Action buttons row
+                // Action buttons stacked vertically to save horizontal space
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Edit button with press animation
+                    // Edit button
                     Button(
-                        onClick = { 
+                        onClick = {
                             editButtonPressed = true
                             showEditDialog = true
                         },
                         modifier = Modifier
-                            .size(36.dp)
+                            .size(30.dp)
                             .graphicsLayer {
                                 scaleX = if (editButtonPressed) 0.95f else 1f
                                 scaleY = if (editButtonPressed) 0.95f else 1f
@@ -496,18 +494,18 @@ private fun InventoryItemCard(
                         Icon(
                             imageVector = Icons.Filled.Edit,
                             contentDescription = "Edit material",
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(15.dp)
                         )
                     }
 
-                    // Delete button - Outlined version with subtle styling and press animation
+                    // Delete button
                     Button(
-                        onClick = { 
+                        onClick = {
                             deleteButtonPressed = true
                             showDeleteConfirmation = true
                         },
                         modifier = Modifier
-                            .size(40.dp)
+                            .size(30.dp)
                             .border(1.dp, OutlineLight, RoundedCornerShape(10.dp))
                             .graphicsLayer {
                                 scaleX = if (deleteButtonPressed) 0.95f else 1f
@@ -522,42 +520,51 @@ private fun InventoryItemCard(
                         Icon(
                             imageVector = Icons.Outlined.Delete,
                             contentDescription = "Delete material",
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(15.dp)
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Details row with category and quantity
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth(),
-                horizontalArrangement = Arrangement.Start,
-                verticalAlignment = Alignment.CenterVertically
+            // Middle section: material name + brand
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                // Category Badge with scale animation on hover
-                CategoryBadge(category = material.category)
-
-                Spacer(modifier = Modifier.width(12.dp))
-
-                // Quantity and Unit
-                QuantityInfo(
-                    quantity = material.quantity,
-                    unit = material.unit,
-                    modifier = Modifier.weight(1f)
+                Text(
+                    text = material.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
+                if (material.description.isNotBlank()) {
+                    Text(
+                        text = material.description,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
+
+            // Bottom section: quantity
+            QuantityInfo(
+                quantity = material.quantity,
+                unit = material.unit
+            )
         }
     }
 
-    // Edit dialog with fade and scale animation
+    // Edit dialog
     if (showEditDialog) {
         EditMaterialDialog(
             material = material,
             categories = categories,
-            onDismiss = { 
+            onDismiss = {
                 showEditDialog = false
                 editButtonPressed = false
             },
@@ -569,10 +576,10 @@ private fun InventoryItemCard(
         )
     }
 
-    // Delete confirmation dialog with fade and scale animation
+    // Delete confirmation dialog
     if (showDeleteConfirmation) {
         AlertDialog(
-            onDismissRequest = { 
+            onDismissRequest = {
                 showDeleteConfirmation = false
                 deleteButtonPressed = false
             },
@@ -594,7 +601,7 @@ private fun InventoryItemCard(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { 
+                TextButton(onClick = {
                     showDeleteConfirmation = false
                     deleteButtonPressed = false
                 }) {
@@ -606,14 +613,42 @@ private fun InventoryItemCard(
 }
 
 /**
+ * Maps category names to Material Icons
+ */
+private fun getCategoryIcon(category: String) = when (category) {
+    "Paint" -> Icons.Filled.Palette
+    "Brushes" -> Icons.Filled.Brush
+    "Paper" -> Icons.Filled.Note
+    "Pens" -> Icons.Filled.Edit
+    "Alcohol Markers" -> Icons.Filled.Edit
+    "Water-based Markers" -> Icons.Filled.Edit
+    "Colored Pencils" -> Icons.Filled.Edit
+    "Drawing Pencils" -> Icons.Filled.Edit
+    "Mechanical Pencil Leads" -> Icons.Filled.Edit
+    "Mechanical Pencils" -> Icons.Filled.Edit
+    "White Pens" -> Icons.Filled.Edit
+    "Glitter Pens" -> Icons.Filled.Edit
+    "Metallic Pens" -> Icons.Filled.Edit
+    "Crayons" -> Icons.Filled.Edit
+    "Highlighters" -> Icons.Filled.Highlight
+    "A4 Notebooks" -> Icons.Filled.Note
+    "A5 Notebooks" -> Icons.Filled.Note
+    "Fountain Pen Cartridges" -> Icons.Filled.Edit
+    "Fineliners" -> Icons.Filled.Edit
+    "Erasers" -> Icons.Filled.Edit
+    else -> Icons.Filled.Palette
+}
+
+/**
  * Category Badge
- * Shows the category of the material in a styled chip with premium pastel colors
- * Includes subtle scale animation on interaction
+ * Shows the category of the material in a styled chip with premium pastel colors.
+ * In compact mode (used in grid cards) shows only the icon to save space.
  */
 @Composable
 private fun CategoryBadge(
     category: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    compact: Boolean = false
 ) {
     var isHovered by remember { mutableStateOf(false) }
     
@@ -643,6 +678,7 @@ private fun CategoryBadge(
     }    
     // Dark text for good contrast on pastels
     val textColor = Color(0xFF2D3748)
+    val iconTint = Color(0xFF795548) // Warm brown — natural, cozy
 
     Box(
         modifier = modifier
@@ -651,20 +687,36 @@ private fun CategoryBadge(
                 shape = RoundedCornerShape(18.dp)
             )
             .border(1.dp, OutlineLight.copy(alpha = 0.6f), RoundedCornerShape(18.dp))
-            .padding(horizontal = 16.dp, vertical = 10.dp)
+            .padding(
+                horizontal = if (compact) 8.dp else 16.dp,
+                vertical = if (compact) 6.dp else 10.dp
+            )
             .graphicsLayer {
                 scaleX = if (isHovered) 1.05f else 1f
                 scaleY = if (isHovered) 1.05f else 1f
             },
         contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = category,
-            style = MaterialTheme.typography.bodySmall,
-            color = textColor,
-            fontWeight = FontWeight.Medium,
-            letterSpacing = 0.2.sp
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Icon(
+                imageVector = getCategoryIcon(category),
+                contentDescription = category,
+                modifier = Modifier.size(if (compact) 13.dp else 14.dp),
+                tint = iconTint
+            )
+            if (!compact) {
+                Text(
+                    text = category,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = textColor,
+                    fontWeight = FontWeight.Medium,
+                    letterSpacing = 0.2.sp
+                )
+            }
+        }
     }
 }
 
@@ -694,8 +746,8 @@ private fun QuantityInfo(
 
 /**
  * Empty Inventory State
- * Displayed when there are no materials in inventory
- * Features fade and scale animation on appearance
+ * Displayed when there are no materials in inventory at all.
+ * Features fade and scale animation on appearance.
  */
 @Composable
 private fun EmptyInventoryState(
@@ -723,24 +775,26 @@ private fun EmptyInventoryState(
         ) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                modifier = Modifier.padding(horizontal = 40.dp)
             ) {
                 Icon(
-                    imageVector = Icons.Filled.Inventory2,
+                    imageVector = Icons.Filled.Eco,
                     contentDescription = null,
                     modifier = Modifier.size(64.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    tint = Color(0xFF81C784)
                 )
                 Text(
-                    text = "No Materials",
+                    text = "It's quiet here...",
                     style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = "Your inventory is empty. Start by adding materials.",
+                    text = "Maybe Nook has it? Add your first material to get started.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    textAlign = TextAlign.Center
                 )
             }
         }
@@ -748,9 +802,9 @@ private fun EmptyInventoryState(
 }
 
 /**
- * Empty Search State
- * Displayed when search or filter returns no results
- * Features fade and scale animation on appearance
+ * Empty Search/Filter State
+ * Displayed when a search query or category filter returns no results.
+ * Features fade and scale animation on appearance.
  */
 @Composable
 private fun EmptySearchState(
@@ -778,24 +832,26 @@ private fun EmptySearchState(
         ) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                modifier = Modifier.padding(horizontal = 40.dp)
             ) {
                 Icon(
-                    imageVector = Icons.Filled.Inventory2,
+                    imageVector = Icons.Filled.Eco,
                     contentDescription = null,
                     modifier = Modifier.size(64.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    tint = Color(0xFF81C784)
                 )
                 Text(
-                    text = "No Results",
+                    text = "It's quiet here...",
                     style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = "No materials match your search or filter criteria.",
+                    text = "Maybe Nook has it? Try a different search or category.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    textAlign = TextAlign.Center
                 )
             }
         }

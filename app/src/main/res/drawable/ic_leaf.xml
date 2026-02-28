@@ -1,0 +1,30 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <!--
+        Single minimalist leaf silhouette.
+        The leaf body is a rounded teardrop drawn with cubic beziers.
+        The center vein is a thin stroke from tip to stem.
+        Color is brown (#795548) — tint will be applied in code via ColorFilter.
+    -->
+
+    <!-- Leaf body: starts at tip (24,4), curves out to right, rounds at base, curves back to tip -->
+    <path
+        android:fillColor="#795548"
+        android:pathData="
+            M 24,4
+            C 36,8 42,18 38,30
+            C 35,38 28,43 24,44
+            C 20,43 13,38 10,30
+            C 6,18 12,8 24,4
+            Z" />
+
+    <!-- Center vein: thin line from tip down to base -->
+    <path
+        android:strokeColor="#795548"
+        android:strokeWidth="1.2"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M 24,6 Q 24,24 24,42" />
+</vector>
