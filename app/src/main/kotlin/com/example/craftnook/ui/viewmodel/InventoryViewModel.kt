@@ -1,5 +1,6 @@
 package com.example.craftnook.ui.viewmodel
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import android.net.Uri
@@ -10,7 +11,11 @@ import com.example.craftnook.data.repository.IArtMaterialRepository
 import com.example.craftnook.data.repository.IBackupRepository
 import com.example.craftnook.data.repository.ICategoryRepository
 import com.example.craftnook.data.repository.IUsageLogRepository
+import com.example.craftnook.data.util.copyImageToInternalStorage
+import com.example.craftnook.data.util.deleteInternalImage
+import com.example.craftnook.data.util.isInternalImagePath
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -67,6 +72,7 @@ sealed class BackupResult {
  */
 @HiltViewModel
 class InventoryViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val materialRepository: IArtMaterialRepository,
     private val logRepository: IUsageLogRepository,
     private val categoryRepository: ICategoryRepository,
@@ -271,6 +277,11 @@ class InventoryViewModel @Inject constructor(
 
     /**
      * Add a new material and write an ADDED log entry.
+     *
+     * If [imageUri] is a `content://` URI (from the photo picker) it is first
+     * copied into the app's private files directory so the image persists even
+     * if the user later deletes it from the gallery.  If it already points to
+     * an internal path it is used as-is.
      */
     fun addMaterial(
         name: String,
@@ -283,7 +294,13 @@ class InventoryViewModel @Inject constructor(
             _isLoading.value = true
             _errorMessage.value = null
             try {
-                val result = materialRepository.addMaterial(name, brand, quantity, category, imageUri)
+                // Copy external content:// URI into private storage once
+                val internalUri = imageUri?.let { uriString ->
+                    if (isInternalImagePath(context, uriString)) uriString
+                    else copyImageToInternalStorage(context, Uri.parse(uriString)) ?: uriString
+                }
+
+                val result = materialRepository.addMaterial(name, brand, quantity, category, internalUri)
                 result.onSuccess { material ->
                     writeLog(
                         material     = material,
@@ -302,7 +319,8 @@ class InventoryViewModel @Inject constructor(
     }
 
     /**
-     * Delete a material and write a DELETED log entry capturing the final quantity.
+     * Delete a material, write a DELETED log entry, and remove the internal
+     * image file (if any) to avoid orphaned files accumulating.
      */
     fun deleteMaterial(materialId: String) {
         viewModelScope.launch {
@@ -315,6 +333,8 @@ class InventoryViewModel @Inject constructor(
                 val result = materialRepository.deleteMaterial(materialId)
                 result.onSuccess {
                     if (snapshot != null) {
+                        // Clean up private image file
+                        deleteInternalImage(context, snapshot.photoUri)
                         writeLog(
                             material  = snapshot,
                             eventType = EventType.DELETED,
@@ -335,37 +355,51 @@ class InventoryViewModel @Inject constructor(
     /**
      * Update a material.
      *
+     * - If [material.photoUri] is a new `content://` URI it is copied to
+     *   private storage and the old internal file (if any) is deleted.
      * - If quantity increased → write RESTOCKED automatically.
      * - If quantity decreased → surface [PendingQuantityConfirmation] so the UI
      *   can ask the user whether this was real usage or a correction.
      * - If quantity unchanged → no log entry.
-     * - Other field changes (name, brand, photo…) also produce no log entry.
      */
     fun updateMaterial(material: ArtMaterial) {
         viewModelScope.launch {
             _isLoading.value = true
             _errorMessage.value = null
             try {
-                val oldQty = allMaterials.value
-                    .firstOrNull { it.id == material.id }
-                    ?.quantity ?: material.quantity
+                val old = allMaterials.value.firstOrNull { it.id == material.id }
+                val oldQty = old?.quantity ?: material.quantity
 
-                val result = materialRepository.updateMaterial(material)
+                // Copy new image if the URI changed and is not already internal
+                val newPhotoUri: String? = material.photoUri?.let { uriString ->
+                    if (isInternalImagePath(context, uriString)) uriString
+                    else {
+                        val copied = copyImageToInternalStorage(context, Uri.parse(uriString))
+                        // Delete the old internal file only after the copy succeeds
+                        if (copied != null && old?.photoUri != uriString) {
+                            deleteInternalImage(context, old?.photoUri)
+                        }
+                        copied ?: uriString
+                    }
+                }
+                val updatedMaterial = material.copy(photoUri = newPhotoUri)
+
+                val result = materialRepository.updateMaterial(updatedMaterial)
                 result.onSuccess {
-                    val delta = material.quantity - oldQty
+                    val delta = updatedMaterial.quantity - oldQty
                     when {
                         delta > 0 -> writeLog(
-                            material  = material,
+                            material  = updatedMaterial,
                             eventType = EventType.RESTOCKED,
                             delta     = delta,
-                            qtyAfter  = material.quantity
+                            qtyAfter  = updatedMaterial.quantity
                         )
                         delta < 0 -> {
                             // Ask user: used or correction?
                             _pendingQuantityConfirmation.value = PendingQuantityConfirmation(
-                                material    = material,
+                                material    = updatedMaterial,
                                 oldQuantity = oldQty,
-                                newQuantity = material.quantity
+                                newQuantity = updatedMaterial.quantity
                             )
                         }
                         // delta == 0 → no log entry needed

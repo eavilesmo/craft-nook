@@ -931,7 +931,7 @@ private fun EmptyInventoryState(
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = "Maybe Nook has it? Add your first material to get started.",
+                    text = "Add your first material to get started.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center
@@ -988,7 +988,7 @@ private fun EmptySearchState(
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = "Maybe Nook has it? Try a different search or category.",
+                    text = "Try a different search or category.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center
