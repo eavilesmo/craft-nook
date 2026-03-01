@@ -2,10 +2,12 @@ package com.example.craftnook.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import android.net.Uri
 import com.example.craftnook.data.database.EventType
 import com.example.craftnook.data.database.UsageLog
 import com.example.craftnook.data.repository.ArtMaterial
 import com.example.craftnook.data.repository.IArtMaterialRepository
+import com.example.craftnook.data.repository.IBackupRepository
 import com.example.craftnook.data.repository.ICategoryRepository
 import com.example.craftnook.data.repository.IUsageLogRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -42,6 +44,13 @@ data class PendingQuantityConfirmation(
     val newQuantity: Int
 )
 
+/** Outcome of a backup export or import operation, shown to the user as a snackbar. */
+sealed class BackupResult {
+    object ExportSuccess : BackupResult()
+    data class ImportSuccess(val materialsAdded: Int, val logsAdded: Int) : BackupResult()
+    data class Failure(val message: String) : BackupResult()
+}
+
 // ── ViewModel ────────────────────────────────────────────────────────────────
 
 /**
@@ -60,7 +69,8 @@ data class PendingQuantityConfirmation(
 class InventoryViewModel @Inject constructor(
     private val materialRepository: IArtMaterialRepository,
     private val logRepository: IUsageLogRepository,
-    private val categoryRepository: ICategoryRepository
+    private val categoryRepository: ICategoryRepository,
+    private val backupRepository: IBackupRepository
 ) : ViewModel() {
 
     companion object {
@@ -196,6 +206,17 @@ class InventoryViewModel @Inject constructor(
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
+    // ── Backup state ─────────────────────────────────────────────────────────
+
+    /**
+     * One-shot result of the latest export or import operation.
+     * The UI consumes this (calls [clearBackupResult]) after showing the snackbar.
+     */
+    private val _backupResult = MutableStateFlow<BackupResult?>(null)
+    val backupResult: StateFlow<BackupResult?> = _backupResult.asStateFlow()
+
+    fun clearBackupResult() { _backupResult.value = null }
+
     // ── Public actions ───────────────────────────────────────────────────────
 
     fun updateSearchQuery(query: String) { _searchQuery.value = query }
@@ -203,6 +224,29 @@ class InventoryViewModel @Inject constructor(
     fun selectCategory(category: String) { _selectedCategory.value = category }
 
     fun clearError() { _errorMessage.value = null }
+
+    // ── Backup actions ───────────────────────────────────────────────────────
+
+    fun exportBackup(uri: Uri) {
+        viewModelScope.launch {
+            backupRepository.exportToUri(uri)
+                .onSuccess { _backupResult.value = BackupResult.ExportSuccess }
+                .onFailure { _backupResult.value = BackupResult.Failure(it.message ?: "Export failed") }
+        }
+    }
+
+    fun importBackup(uri: Uri) {
+        viewModelScope.launch {
+            backupRepository.importFromUri(uri)
+                .onSuccess { summary ->
+                    _backupResult.value = BackupResult.ImportSuccess(
+                        materialsAdded = summary.materialsImported,
+                        logsAdded      = summary.logsImported
+                    )
+                }
+                .onFailure { _backupResult.value = BackupResult.Failure(it.message ?: "Import failed") }
+        }
+    }
 
     // ── Category management ──────────────────────────────────────────────────
 

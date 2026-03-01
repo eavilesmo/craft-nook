@@ -7,6 +7,12 @@
     <uses-permission
         android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
+    <!-- Required for writing files to external storage on API <= 28.
+         On API 29+ the SAF (Storage Access Framework) grants URI-based access
+         without a runtime permission, so no extra permission is needed there. -->
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
 
     <application
         android:name=".MyApplication"

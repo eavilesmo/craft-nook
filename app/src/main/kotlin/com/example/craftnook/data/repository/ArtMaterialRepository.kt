@@ -6,11 +6,13 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.serialization.Serializable
 
 /**
  * ArtMaterial entity for Room Database
  * Represents an art material in the inventory with all its details
  */
+@Serializable
 @Entity(tableName = "art_materials")
 data class ArtMaterial(
     @PrimaryKey

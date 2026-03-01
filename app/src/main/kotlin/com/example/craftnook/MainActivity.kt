@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,9 +13,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Eco
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -27,6 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -34,7 +33,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.craftnook.ui.navigation.AppNavigation
 import com.example.craftnook.ui.theme.BackgroundLight
 import com.example.craftnook.ui.theme.CraftNookTheme
-import com.example.craftnook.ui.theme.PrimaryLight
 import com.example.craftnook.ui.viewmodel.InventoryViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.delay
@@ -112,11 +110,10 @@ private fun SplashOverlay(alpha: Float) {
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(
-                imageVector        = Icons.Filled.Eco,
+            Image(
+                painter            = painterResource(R.drawable.app_logo),
                 contentDescription = "Craft Nook logo",
-                tint               = PrimaryLight,
-                modifier           = Modifier.size(80.dp)
+                modifier           = Modifier.size(160.dp)
             )
             Spacer(modifier = Modifier.height(16.dp))
             Text(

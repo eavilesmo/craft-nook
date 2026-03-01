@@ -42,12 +42,14 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Brush
+import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.Eco
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Highlight
 import androidx.compose.material.icons.filled.Note
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.SaveAlt
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.AlertDialog
@@ -67,12 +69,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -117,6 +122,7 @@ import com.example.craftnook.ui.theme.CategoryPensColor
 import com.example.craftnook.ui.theme.CategoryWaterbasedMarkersColor
 import com.example.craftnook.ui.theme.CategoryWhitePensColor
 import com.example.craftnook.ui.theme.OutlineLight
+import com.example.craftnook.ui.viewmodel.BackupResult
 import com.example.craftnook.ui.viewmodel.InventoryViewModel
 import com.example.craftnook.ui.viewmodel.PendingQuantityConfirmation
 import kotlinx.coroutines.launch
@@ -138,9 +144,27 @@ fun InventoryScreen(
     val selectedCategory by viewModel.selectedCategory.collectAsState()
     val availableCategories by viewModel.availableCategories.collectAsState()
     val pendingConfirmation by viewModel.pendingQuantityConfirmation.collectAsState()
+    val backupResult by viewModel.backupResult.collectAsState()
+
     var showAddMaterialDialog by remember { mutableStateOf(false) }
     var showManageCategoriesDialog by remember { mutableStateOf(false) }
+    var showBackupDialog by remember { mutableStateOf(false) }
     var fabPressed by remember { mutableStateOf(false) }
+
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // Show a snackbar whenever a backup result arrives
+    LaunchedEffect(backupResult) {
+        val result = backupResult ?: return@LaunchedEffect
+        val message = when (result) {
+            is BackupResult.ExportSuccess    -> "Backup exported successfully."
+            is BackupResult.ImportSuccess    ->
+                "Import complete: ${result.materialsAdded} materials, ${result.logsAdded} journal entries added."
+            is BackupResult.Failure          -> "Error: ${result.message}"
+        }
+        snackbarHostState.showSnackbar(message)
+        viewModel.clearBackupResult()
+    }
 
     // Material details bottom sheet state
     var selectedMaterial by remember { mutableStateOf<ArtMaterial?>(null) }
@@ -163,9 +187,11 @@ fun InventoryScreen(
         topBar = {
             InventoryTopAppBar(
                 totalItems = materials.size,
-                onManageCategories = { showManageCategoriesDialog = true }
+                onManageCategories = { showManageCategoriesDialog = true },
+                onBackupRestore    = { showBackupDialog = true }
             )
         },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = {
@@ -289,6 +315,14 @@ fun InventoryScreen(
             onDismiss      = { showManageCategoriesDialog = false }
         )
     }
+
+    // Backup & Restore dialog
+    if (showBackupDialog) {
+        BackupRestoreDialog(
+            viewModel = viewModel,
+            onDismiss = { showBackupDialog = false }
+        )
+    }
 }
 
 /**
@@ -389,8 +423,11 @@ private fun CategoryFilterRow(
 @Composable
 private fun InventoryTopAppBar(
     totalItems: Int,
-    onManageCategories: () -> Unit
+    onManageCategories: () -> Unit,
+    onBackupRestore: () -> Unit
 ) {
+    var showSettingsMenu by remember { mutableStateOf(false) }
+
     TopAppBar(
         title = {
             Text(
@@ -400,16 +437,43 @@ private fun InventoryTopAppBar(
             )
         },
         actions = {
-            IconButton(onClick = onManageCategories) {
-                Icon(
-                    imageVector = Icons.Filled.Settings,
-                    contentDescription = "Manage categories",
-                    tint = MaterialTheme.colorScheme.onPrimary
-                )
+            Box {
+                IconButton(onClick = { showSettingsMenu = true }) {
+                    Icon(
+                        imageVector        = Icons.Filled.Settings,
+                        contentDescription = "Settings",
+                        tint               = MaterialTheme.colorScheme.onPrimary
+                    )
+                }
+                DropdownMenu(
+                    expanded         = showSettingsMenu,
+                    onDismissRequest = { showSettingsMenu = false }
+                ) {
+                    DropdownMenuItem(
+                        text    = { Text("Manage Categories") },
+                        leadingIcon = {
+                            Icon(Icons.Filled.Category, contentDescription = null, modifier = Modifier.size(18.dp))
+                        },
+                        onClick = {
+                            showSettingsMenu = false
+                            onManageCategories()
+                        }
+                    )
+                    DropdownMenuItem(
+                        text    = { Text("Backup & Restore") },
+                        leadingIcon = {
+                            Icon(Icons.Filled.SaveAlt, contentDescription = null, modifier = Modifier.size(18.dp))
+                        },
+                        onClick = {
+                            showSettingsMenu = false
+                            onBackupRestore()
+                        }
+                    )
+                }
             }
         },
         colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.primary,
+            containerColor    = MaterialTheme.colorScheme.primary,
             titleContentColor = MaterialTheme.colorScheme.onPrimary
         )
     )

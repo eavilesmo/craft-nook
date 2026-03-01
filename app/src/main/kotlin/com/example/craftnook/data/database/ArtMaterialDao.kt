@@ -40,6 +40,14 @@ interface ArtMaterialDao {
     suspend fun insertMaterial(material: ArtMaterial)
 
     /**
+     * Insert a material only if no row with the same ID already exists.
+     * Used during backup import to avoid overwriting user data with older backup data.
+     * Returns the new rowId, or -1 if the row was skipped due to conflict.
+     */
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertMaterialIfNotExists(material: ArtMaterial): Long
+
+    /**
      * Update an existing material
      * @param material The material to update
      */

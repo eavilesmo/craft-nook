@@ -7,6 +7,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.PrimaryKey
 import androidx.room.Query
 import kotlinx.coroutines.flow.Flow
+import kotlinx.serialization.Serializable
 
 // ── Event type constants ─────────────────────────────────────────────────────
 
@@ -26,6 +27,7 @@ object EventType {
  * copied from the material at the time of the event so that log entries
  * remain readable after a material is renamed or deleted.
  */
+@Serializable
 @Entity(tableName = "usage_logs")
 data class UsageLog(
     @PrimaryKey val id: String,
@@ -51,6 +53,14 @@ interface UsageLogDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(log: UsageLog)
+
+    /**
+     * Insert a log entry only if no row with the same ID already exists.
+     * Used during backup import to avoid duplicate journal entries.
+     * Returns the new rowId, or -1 if the row was skipped due to conflict.
+     */
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertIfNotExists(log: UsageLog): Long
 
     /** All entries, newest first. */
     @Query("SELECT * FROM usage_logs ORDER BY timestamp DESC")

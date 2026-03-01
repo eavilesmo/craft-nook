@@ -1,11 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="192dp"
-    android:height="192dp"
-    android:viewportWidth="192"
-    android:viewportHeight="192">
-    <!-- Material Design 3 Purple -->
-    <path
-        android:fillColor="#EADDFF"
-        android:pathData="M96,96 m-60,0 a60,60 0 1,1 120,0 a60,60 0 1,1 -120,0" />
-</vector>
+<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
+    android:src="@drawable/app_logo"
+    android:gravity="center"
+    android:tileMode="disabled" />
