@@ -96,10 +96,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.painterResource
+import androidx.compose.foundation.Image
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import androidx.compose.ui.platform.LocalContext
 import coil.transform.RoundedCornersTransformation
+import com.example.craftnook.R
 import com.example.craftnook.data.repository.ArtMaterial
 import com.example.craftnook.ui.theme.CategoryA4NotebooksColor
 import com.example.craftnook.ui.theme.CategoryA5NotebooksColor
@@ -430,11 +433,23 @@ private fun InventoryTopAppBar(
 
     TopAppBar(
         title = {
-            Text(
-                text = "Craft Nook",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Image(
+                    painter            = painterResource(R.drawable.app_logo),
+                    contentDescription = "Craft Nook logo",
+                    modifier           = Modifier
+                        .size(32.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                )
+                Text(
+                    text       = "Craft Nook",
+                    style      = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
         },
         actions = {
             Box {

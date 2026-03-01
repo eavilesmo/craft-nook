@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -86,6 +87,11 @@ fun ManageCategoriesDialog(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 // ── Add new category ──────────────────────────────────────
+                Text(
+                    text = "New category",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -94,7 +100,6 @@ fun ManageCategoriesDialog(
                     OutlinedTextField(
                         value = newCategoryName,
                         onValueChange = { newCategoryName = it },
-                        label = { Text("New category") },
                         singleLine = true,
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(12.dp),
@@ -108,7 +113,7 @@ fun ManageCategoriesDialog(
                         onClick = { commitAdd() },
                         enabled = isAddEnabled,
                         shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.size(width = 56.dp, height = 56.dp)
+                        modifier = Modifier.height(56.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Filled.Add,
