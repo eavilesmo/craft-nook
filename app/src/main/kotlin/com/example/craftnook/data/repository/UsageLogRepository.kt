@@ -12,6 +12,9 @@ interface IUsageLogRepository {
 
     /** Insert a single log entry. */
     suspend fun insertLog(log: UsageLog)
+
+    /** Delete every log entry. */
+    suspend fun clearAllLogs()
 }
 
 // ── Room implementation ──────────────────────────────────────────────────────
@@ -25,4 +28,7 @@ class RoomUsageLogRepository(
 
     override suspend fun insertLog(log: UsageLog) =
         usageLogDao.insert(log)
+
+    override suspend fun clearAllLogs() =
+        usageLogDao.deleteAll()
 }

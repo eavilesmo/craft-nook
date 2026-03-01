@@ -254,6 +254,15 @@ class InventoryViewModel @Inject constructor(
         }
     }
 
+    // ── Journal actions ──────────────────────────────────────────────────────
+
+    /** Delete every usage log entry. The [logEntries] Flow updates instantly. */
+    fun clearJournal() {
+        viewModelScope.launch {
+            logRepository.clearAllLogs()
+        }
+    }
+
     // ── Category management ──────────────────────────────────────────────────
 
     fun addCategory(name: String) {

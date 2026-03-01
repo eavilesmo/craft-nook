@@ -28,20 +28,24 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.BookmarkAdded
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -116,8 +120,9 @@ private fun Long.toEntryDate(): String  = entryFormatter.format(Date(this))
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun JournalScreen(viewModel: InventoryViewModel) {
-    val allLogs    by viewModel.logEntries.collectAsState()
+    val allLogs      by viewModel.logEntries.collectAsState()
     var activeFilter by remember { mutableStateOf("All") }
+    var showClearDialog by remember { mutableStateOf(false) }
 
     val filteredLogs = if (activeFilter == "All") allLogs
                        else allLogs.filter { it.eventType == activeFilter }
@@ -125,6 +130,52 @@ fun JournalScreen(viewModel: InventoryViewModel) {
     // Group by month, preserving newest-first order
     val byMonth: Map<String, List<UsageLog>> = filteredLogs
         .groupBy { it.timestamp.toMonthKey() }
+
+    // ── Clear history confirmation dialog ────────────────────────────────────
+    if (showClearDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearDialog = false },
+            containerColor   = Color.White,
+            shape            = RoundedCornerShape(20.dp),
+            title = {
+                Text(
+                    text  = "Clear history",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = OnBackgroundLight
+                )
+            },
+            text = {
+                Text(
+                    text  = "Are you sure you want to clear your history? This cannot be undone.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = OnBackgroundLight.copy(alpha = 0.75f)
+                )
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearDialog = false }) {
+                    Text(
+                        text  = "Cancel",
+                        color = OnBackgroundLight.copy(alpha = 0.6f),
+                        style = MaterialTheme.typography.labelLarge
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.clearJournal()
+                        showClearDialog = false
+                    }
+                ) {
+                    Text(
+                        text  = "Clear Everything",
+                        color = ErrorLight,
+                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
+                    )
+                }
+            }
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -134,6 +185,15 @@ fun JournalScreen(viewModel: InventoryViewModel) {
                         "Usage Journal",
                         style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold)
                     )
+                },
+                actions = {
+                    IconButton(onClick = { showClearDialog = true }) {
+                        Icon(
+                            imageVector        = Icons.Filled.DeleteSweep,
+                            contentDescription = "Clear journal",
+                            tint               = OnBackgroundLight.copy(alpha = 0.6f)
+                        )
+                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor    = PrimaryContainerLight,
