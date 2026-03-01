@@ -1,13 +1,15 @@
 package com.example.craftnook.ui.navigation
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoStories
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Inventory2
-import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.outlined.AutoStories
 import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.Inventory2
-import androidx.compose.material.icons.outlined.MenuBook
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -17,6 +19,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -32,6 +36,12 @@ import com.example.craftnook.ui.theme.OnBackgroundLight
 import com.example.craftnook.ui.theme.PrimaryContainerLight
 import com.example.craftnook.ui.theme.PrimaryLight
 import com.example.craftnook.ui.viewmodel.InventoryViewModel
+
+// Beige/off-white tint for the selected icon — contrasts clearly against the green bubble
+private val SelectedIconTint = Color(0xFFFFF8F0)
+
+// Solid green indicator bubble (full opacity)
+private val IndicatorColor = PrimaryLight
 
 /** All navigation routes in the Craft Nook application. */
 sealed class CraftNookRoute(
@@ -54,9 +64,9 @@ sealed class CraftNookRoute(
     )
     data object Journal : CraftNookRoute(
         route          = "journal",
-        label          = "Journal",
-        selectedIcon   = Icons.Filled.MenuBook,
-        unselectedIcon = Icons.Outlined.MenuBook
+        label          = "Usage Journal",
+        selectedIcon   = Icons.Filled.AutoStories,
+        unselectedIcon = Icons.Outlined.AutoStories
     )
 }
 
@@ -68,7 +78,7 @@ private val bottomNavItems = listOf(
 
 /**
  * Main navigation graph with a three-tab bottom navigation bar:
- * Inventory · Stats · Journal (Usage Journal).
+ * Inventory · Stats · Usage Journal.
  */
 @Composable
 fun AppNavigation(
@@ -84,6 +94,17 @@ fun AppNavigation(
                 bottomNavItems.forEach { item ->
                     val selected =
                         currentDestination?.hierarchy?.any { it.route == item.route } == true
+
+                    // Bounce/pop: spring from 0.75 → 1.0 when selected
+                    val scale by animateFloatAsState(
+                        targetValue = if (selected) 1f else 0.75f,
+                        animationSpec = spring(
+                            dampingRatio = 0.4f,   // underdamped → bouncy
+                            stiffness    = 400f
+                        ),
+                        label = "navIconScale_${item.route}"
+                    )
+
                     NavigationBarItem(
                         selected = selected,
                         onClick  = {
@@ -98,16 +119,19 @@ fun AppNavigation(
                         icon = {
                             Icon(
                                 imageVector        = if (selected) item.selectedIcon else item.unselectedIcon,
-                                contentDescription = item.label
+                                contentDescription = item.label,
+                                modifier           = Modifier.scale(scale)
                             )
                         },
                         label  = { Text(item.label) },
                         colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor   = PrimaryLight,
+                            // Beige/off-white icon inside the green bubble
+                            selectedIconColor   = SelectedIconTint,
                             selectedTextColor   = PrimaryLight,
                             unselectedIconColor = OnBackgroundLight.copy(alpha = 0.55f),
                             unselectedTextColor = OnBackgroundLight.copy(alpha = 0.55f),
-                            indicatorColor      = PrimaryLight.copy(alpha = 0.18f)
+                            // Full-opacity green bubble
+                            indicatorColor      = IndicatorColor
                         )
                     )
                 }

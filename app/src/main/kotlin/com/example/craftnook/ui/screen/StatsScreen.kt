@@ -121,6 +121,7 @@ private fun Color.darken(factor: Float = 0.25f): Color {
 fun StatsScreen(viewModel: InventoryViewModel) {
     val categoryStats by viewModel.categoryStats.collectAsState()
     val allMaterials  by viewModel.allMaterials.collectAsState()
+    val totalUnits    by viewModel.totalUnits.collectAsState()
 
     Scaffold(
         topBar = {
@@ -153,6 +154,7 @@ fun StatsScreen(viewModel: InventoryViewModel) {
                 // Summary cards row
                 SummaryRow(
                     totalItems      = allMaterials.size,
+                    totalUnits      = totalUnits,
                     categoriesUsed  = categoryStats.size,
                     topCategory     = categoryStats.firstOrNull()?.category ?: ""
                 )
@@ -172,32 +174,46 @@ fun StatsScreen(viewModel: InventoryViewModel) {
 @Composable
 private fun SummaryRow(
     totalItems: Int,
+    totalUnits: Int,
     categoriesUsed: Int,
     topCategory: String
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        SummaryCard(
-            modifier = Modifier.weight(1f),
-            label  = "Total items",
-            value  = totalItems.toString(),
-            color  = PrimaryLight
-        )
-        SummaryCard(
-            modifier = Modifier.weight(1f),
-            label  = "Categories",
-            value  = categoriesUsed.toString(),
-            color  = CategoryColoredPencilsColor.darken(0.08f)
-        )
-        SummaryCard(
-            modifier = Modifier.weight(1f),
-            label  = "Top category",
-            value  = topCategory,
-            color  = CategoryAlcoholMarkersColor.darken(0.08f),
-            smallText = true
-        )
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            SummaryCard(
+                modifier = Modifier.weight(1f),
+                label  = "Total entries",
+                value  = totalItems.toString(),
+                color  = PrimaryLight
+            )
+            SummaryCard(
+                modifier = Modifier.weight(1f),
+                label  = "Total units",
+                value  = totalUnits.toString(),
+                color  = CategoryFinelinersColor.darken(0.05f)
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            SummaryCard(
+                modifier = Modifier.weight(1f),
+                label  = "Categories",
+                value  = categoriesUsed.toString(),
+                color  = CategoryColoredPencilsColor.darken(0.08f)
+            )
+            SummaryCard(
+                modifier = Modifier.weight(1f),
+                label  = "Top category",
+                value  = topCategory,
+                color  = CategoryAlcoholMarkersColor.darken(0.08f),
+                smallText = true
+            )
+        }
     }
 }
 
@@ -254,13 +270,13 @@ private fun BarChartCard(stats: List<CategoryStat>) {
     ) {
         Column(modifier = Modifier.padding(top = 20.dp, start = 16.dp, end = 16.dp, bottom = 12.dp)) {
             Text(
-                text  = "Items per category",
+                text  = "Units per category",
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                 color = OnBackgroundLight
             )
             Spacer(Modifier.height(4.dp))
             Text(
-                text  = "Number of distinct material entries in each category",
+                text  = "Total units (quantity) in each category",
                 style = MaterialTheme.typography.bodySmall,
                 color = OnBackgroundLight.copy(alpha = 0.55f)
             )
@@ -286,12 +302,14 @@ private val LABEL_HEIGHT = 56.dp   // reserved below bars for rotated labels
 
 @Composable
 private fun BarChart(stats: List<CategoryStat>) {
-    val maxCount = stats.maxOf { it.count }.coerceAtLeast(1)
+    val maxUnits = stats.maxOf { it.units }.coerceAtLeast(1)
 
-    // One Animatable per bar so they animate in sequence
+    // One Animatable per bar, reset every time stats identity changes
     val animatables = remember(stats) { stats.map { Animatable(0f) } }
-    LaunchedEffect(stats) {
+    // Use a separate key that changes on every composition of this screen visit
+    LaunchedEffect(animatables) {
         animatables.forEachIndexed { index, anim ->
+            anim.snapTo(0f)
             anim.animateTo(
                 targetValue = 1f,
                 animationSpec = tween(
@@ -318,16 +336,16 @@ private fun BarChart(stats: List<CategoryStat>) {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Bottom
             ) {
-                // Count label above bar
+                // Unit count label above bar
                 Text(
-                    text  = stat.count.toString(),
+                    text  = stat.units.toString(),
                     style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                     color = OnBackgroundLight
                 )
                 Spacer(Modifier.height(4.dp))
 
                 // Animated bar
-                val barHeightFraction = (stat.count.toFloat() / maxCount) * animProgress
+                val barHeightFraction = (stat.units.toFloat() / maxUnits) * animProgress
                 Box(
                     modifier = Modifier
                         .width(BAR_WIDTH)
@@ -424,10 +442,10 @@ private fun LegendRow(stat: CategoryStat) {
         Spacer(Modifier.width(8.dp))
 
         Text(
-            text  = "${stat.count} (${stat.percentage.toInt()}%)",
+            text  = "${stat.units} units (${stat.percentage.toInt()}%)",
             style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
             color = OnBackgroundLight,
-            modifier = Modifier.width(72.dp),
+            modifier = Modifier.width(84.dp),
             textAlign = TextAlign.End
         )
     }

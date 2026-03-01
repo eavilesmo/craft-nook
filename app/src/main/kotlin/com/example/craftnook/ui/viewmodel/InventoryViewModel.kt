@@ -6,6 +6,7 @@ import com.example.craftnook.data.database.EventType
 import com.example.craftnook.data.database.UsageLog
 import com.example.craftnook.data.repository.ArtMaterial
 import com.example.craftnook.data.repository.IArtMaterialRepository
+import com.example.craftnook.data.repository.ICategoryRepository
 import com.example.craftnook.data.repository.IUsageLogRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
@@ -15,7 +16,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.emptyFlow
-import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.util.UUID
@@ -26,7 +27,7 @@ import javax.inject.Inject
 /** Per-category statistics used by the Stats screen. */
 data class CategoryStat(
     val category: String,
-    val count: Int,
+    val units: Int,
     val percentage: Float
 )
 
@@ -50,35 +51,44 @@ data class PendingQuantityConfirmation(
  * [UsageLog] entry. When an edit reduces quantity the ViewModel surfaces a
  * [PendingQuantityConfirmation] event so the UI can ask the user whether
  * the reduction represents real usage or just a correction.
+ *
+ * Categories are now backed by a Room table ([ICategoryRepository]) instead
+ * of a hardcoded list. The [availableCategories] flow always emits them
+ * sorted A→Z (the DAO handles ordering).
  */
 @HiltViewModel
 class InventoryViewModel @Inject constructor(
     private val materialRepository: IArtMaterialRepository,
-    private val logRepository: IUsageLogRepository
+    private val logRepository: IUsageLogRepository,
+    private val categoryRepository: ICategoryRepository
 ) : ViewModel() {
 
     companion object {
+        /**
+         * Kept for reference / backward-compat (e.g. migration seed).
+         * The live source of truth is now the Room [categories] table.
+         */
         val FIXED_CATEGORIES = listOf(
-            "Paint",
-            "Brushes",
-            "Paper",
-            "Pens",
-            "Alcohol Markers",
-            "Water-based Markers",
-            "Colored Pencils",
-            "Drawing Pencils",
-            "Mechanical Pencil Leads",
-            "Mechanical Pencils",
-            "White Pens",
-            "Glitter Pens",
-            "Metallic Pens",
-            "Crayons",
-            "Highlighters",
             "A4 Notebooks",
             "A5 Notebooks",
-            "Fountain Pen Cartridges",
+            "Alcohol Markers",
+            "Brushes",
+            "Colored Pencils",
+            "Crayons",
+            "Drawing Pencils",
+            "Erasers",
             "Fineliners",
-            "Erasers"
+            "Fountain Pen Cartridges",
+            "Glitter Pens",
+            "Highlighters",
+            "Mechanical Pencil Leads",
+            "Mechanical Pencils",
+            "Metallic Pens",
+            "Paint",
+            "Paper",
+            "Pens",
+            "Water-based Markers",
+            "White Pens"
         )
     }
 
@@ -97,13 +107,17 @@ class InventoryViewModel @Inject constructor(
     private val _selectedCategory = MutableStateFlow("All")
     val selectedCategory: StateFlow<String> = _selectedCategory.asStateFlow()
 
-    val availableCategories: StateFlow<List<String>> = allMaterials
-        .combine(_searchQuery) { _, _ -> FIXED_CATEGORIES }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = FIXED_CATEGORIES
-        )
+    /**
+     * Live, alphabetically sorted list of categories from Room.
+     * The DAO orders the query by name ASC, so this is always A→Z.
+     */
+    val availableCategories: StateFlow<List<String>> =
+        categoryRepository.getAllCategoryNames()
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = FIXED_CATEGORIES   // shown immediately before DB loads
+            )
 
     val filteredMaterials: StateFlow<List<ArtMaterial>> = allMaterials
         .combine(_searchQuery) { materials, query ->
@@ -122,25 +136,36 @@ class InventoryViewModel @Inject constructor(
             initialValue = emptyList()
         )
 
-    val categoryStats: StateFlow<List<CategoryStat>> = allMaterials
-        .combine(flowOf(Unit)) { materials, _ ->
-            val totalCount = materials.size
-            if (totalCount == 0) {
+    val categoryStats: StateFlow<List<CategoryStat>> =
+        allMaterials.combine(availableCategories) { materials, categories ->
+            val totalUnits = materials.sumOf { it.quantity }
+            if (totalUnits == 0) {
                 emptyList()
             } else {
-                FIXED_CATEGORIES
+                categories
                     .map { category ->
-                        val count = materials.count { it.category == category }
-                        CategoryStat(category, count, (count.toFloat() / totalCount) * 100f)
+                        val units = materials
+                            .filter { it.category == category }
+                            .sumOf { it.quantity }
+                        CategoryStat(category, units, (units.toFloat() / totalUnits) * 100f)
                     }
-                    .filter { it.count > 0 }
-                    .sortedByDescending { it.count }
+                    .filter { it.units > 0 }
+                    .sortedByDescending { it.units }
             }
         }
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = emptyList()
+        )
+
+    /** Sum of all material quantities across the entire inventory. */
+    val totalUnits: StateFlow<Int> = allMaterials
+        .map { materials -> materials.sumOf { it.quantity } }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = 0
         )
 
     // ── Journal / log state ──────────────────────────────────────────────────
@@ -178,6 +203,27 @@ class InventoryViewModel @Inject constructor(
     fun selectCategory(category: String) { _selectedCategory.value = category }
 
     fun clearError() { _errorMessage.value = null }
+
+    // ── Category management ──────────────────────────────────────────────────
+
+    fun addCategory(name: String) {
+        if (name.isBlank()) return
+        viewModelScope.launch {
+            categoryRepository.addCategory(name)
+        }
+    }
+
+    fun deleteCategory(name: String) {
+        viewModelScope.launch {
+            categoryRepository.deleteCategory(name)
+            // If the deleted category is currently selected, reset to "All"
+            if (_selectedCategory.value == name) {
+                _selectedCategory.value = "All"
+            }
+        }
+    }
+
+    // ── Inventory CRUD ───────────────────────────────────────────────────────
 
     /**
      * Add a new material and write an ADDED log entry.

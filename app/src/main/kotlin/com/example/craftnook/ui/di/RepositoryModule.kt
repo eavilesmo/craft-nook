@@ -1,9 +1,12 @@
 package com.example.craftnook.ui.di
 
 import com.example.craftnook.data.database.ArtMaterialDao
+import com.example.craftnook.data.database.CategoryDao
 import com.example.craftnook.data.database.UsageLogDao
 import com.example.craftnook.data.repository.IArtMaterialRepository
+import com.example.craftnook.data.repository.ICategoryRepository
 import com.example.craftnook.data.repository.IUsageLogRepository
+import com.example.craftnook.data.repository.RoomCategoryRepository
 import com.example.craftnook.data.repository.RoomRepository
 import com.example.craftnook.data.repository.RoomUsageLogRepository
 import dagger.Module
@@ -29,5 +32,11 @@ class RepositoryModule {
     @Singleton
     fun provideUsageLogRepository(usageLogDao: UsageLogDao): IUsageLogRepository {
         return RoomUsageLogRepository(usageLogDao)
+    }
+
+    @Provides
+    @Singleton
+    fun provideCategoryRepository(categoryDao: CategoryDao): ICategoryRepository {
+        return RoomCategoryRepository(categoryDao)
     }
 }

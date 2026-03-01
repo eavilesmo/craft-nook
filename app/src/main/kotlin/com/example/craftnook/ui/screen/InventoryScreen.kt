@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -47,6 +48,7 @@ import androidx.compose.material.icons.filled.Highlight
 import androidx.compose.material.icons.filled.Note
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -137,6 +139,7 @@ fun InventoryScreen(
     val availableCategories by viewModel.availableCategories.collectAsState()
     val pendingConfirmation by viewModel.pendingQuantityConfirmation.collectAsState()
     var showAddMaterialDialog by remember { mutableStateOf(false) }
+    var showManageCategoriesDialog by remember { mutableStateOf(false) }
     var fabPressed by remember { mutableStateOf(false) }
 
     // Material details bottom sheet state
@@ -159,7 +162,8 @@ fun InventoryScreen(
     Scaffold(
         topBar = {
             InventoryTopAppBar(
-                totalItems = materials.size
+                totalItems = materials.size,
+                onManageCategories = { showManageCategoriesDialog = true }
             )
         },
         floatingActionButton = {
@@ -245,7 +249,7 @@ fun InventoryScreen(
 
     if (showAddMaterialDialog) {
         AddMaterialDialog(
-            categories = InventoryViewModel.FIXED_CATEGORIES,
+            categories = availableCategories,
             photoUri = pendingAddPhotoUri,
             onPickPhoto = {
                 addPhotoPickerLauncher.launch(PickVisualMediaRequest(PickVisualMedia.ImageOnly))
@@ -273,6 +277,16 @@ fun InventoryScreen(
             onUsed       = { viewModel.confirmQuantityChange(wasUsed = true) },
             onCorrection = { viewModel.confirmQuantityChange(wasUsed = false) },
             onDismiss    = { viewModel.dismissQuantityConfirmation() }
+        )
+    }
+
+    // Manage Categories dialog
+    if (showManageCategoriesDialog) {
+        ManageCategoriesDialog(
+            categories     = availableCategories,
+            onAddCategory  = { viewModel.addCategory(it) },
+            onDeleteCategory = { viewModel.deleteCategory(it) },
+            onDismiss      = { showManageCategoriesDialog = false }
         )
     }
 }
@@ -374,7 +388,8 @@ private fun CategoryFilterRow(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun InventoryTopAppBar(
-    totalItems: Int
+    totalItems: Int,
+    onManageCategories: () -> Unit
 ) {
     TopAppBar(
         title = {
@@ -384,7 +399,15 @@ private fun InventoryTopAppBar(
                 fontWeight = FontWeight.Bold
             )
         },
-        actions = {},
+        actions = {
+            IconButton(onClick = onManageCategories) {
+                Icon(
+                    imageVector = Icons.Filled.Settings,
+                    contentDescription = "Manage categories",
+                    tint = MaterialTheme.colorScheme.onPrimary
+                )
+            }
+        },
         colors = TopAppBarDefaults.topAppBarColors(
             containerColor = MaterialTheme.colorScheme.primary,
             titleContentColor = MaterialTheme.colorScheme.onPrimary
@@ -930,7 +953,7 @@ private fun AddMaterialDialog(
     var name by remember { mutableStateOf("") }
     var brand by remember { mutableStateOf("") }
     var quantity by remember { mutableStateOf("") }
-    var selectedCategory by remember { mutableStateOf(categories[0]) }
+    var selectedCategory by remember { mutableStateOf(categories.firstOrNull() ?: "") }
     var categoryDropdownExpanded by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
@@ -1029,7 +1052,9 @@ private fun AddMaterialDialog(
                     DropdownMenu(
                         expanded = categoryDropdownExpanded,
                         onDismissRequest = { categoryDropdownExpanded = false },
-                        modifier = Modifier.fillMaxWidth(0.9f)
+                        modifier = Modifier
+                            .fillMaxWidth(0.9f)
+                            .heightIn(max = 240.dp)
                     ) {
                         categories.forEach { category ->
                             DropdownMenuItem(
@@ -1197,7 +1222,9 @@ private fun EditMaterialDialog(
                     DropdownMenu(
                         expanded = categoryDropdownExpanded,
                         onDismissRequest = { categoryDropdownExpanded = false },
-                        modifier = Modifier.fillMaxWidth(0.9f)
+                        modifier = Modifier
+                            .fillMaxWidth(0.9f)
+                            .heightIn(max = 240.dp)
                     ) {
                         categories.forEach { cat ->
                             DropdownMenuItem(

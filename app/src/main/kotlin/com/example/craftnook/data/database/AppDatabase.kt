@@ -10,10 +10,11 @@ import com.example.craftnook.data.repository.ArtMaterial
  * Version history:
  *  1 → 2  Added [ArtMaterial.photoUri] column (migration in DatabaseModule).
  *  2 → 3  Added [UsageLog] table (migration in DatabaseModule).
+ *  3 → 4  Added [Category] table; seeded with the 20 default categories.
  */
 @Database(
-    entities = [ArtMaterial::class, UsageLog::class],
-    version = 3,
+    entities = [ArtMaterial::class, UsageLog::class, Category::class],
+    version = 4,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -21,6 +22,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun artMaterialDao(): ArtMaterialDao
 
     abstract fun usageLogDao(): UsageLogDao
+
+    abstract fun categoryDao(): CategoryDao
 
     companion object {
         const val DATABASE_NAME = "craft_nook_database"
