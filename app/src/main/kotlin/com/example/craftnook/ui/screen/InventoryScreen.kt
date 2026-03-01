@@ -1095,9 +1095,7 @@ private fun AddMaterialDialog(
                 )
 
                 // Category dropdown
-                Box(
-                    modifier = Modifier.fillMaxWidth()
-                ) {
+                Box(modifier = Modifier.fillMaxWidth()) {
                     OutlinedTextField(
                         value = selectedCategory,
                         onValueChange = {},
@@ -1112,35 +1110,29 @@ private fun AddMaterialDialog(
                             )
                         }
                     )
-
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null
+                            ) { categoryDropdownExpanded = !categoryDropdownExpanded }
+                    )
                     DropdownMenu(
                         expanded = categoryDropdownExpanded,
                         onDismissRequest = { categoryDropdownExpanded = false },
-                        modifier = Modifier
-                            .fillMaxWidth(0.9f)
-                            .heightIn(max = 240.dp)
+                        modifier = Modifier.heightIn(max = 240.dp)
                     ) {
-                        categories.forEach { category ->
+                        categories.forEach { cat ->
                             DropdownMenuItem(
-                                text = { Text(category) },
+                                text = { Text(cat) },
                                 onClick = {
-                                    selectedCategory = category
+                                    selectedCategory = cat
                                     categoryDropdownExpanded = false
                                 }
                             )
                         }
                     }
-
-                    // Invisible button to open dropdown
-                    Button(
-                        onClick = { categoryDropdownExpanded = true },
-                        modifier = Modifier
-                            .matchParentSize()
-                            .alpha(0f),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.Transparent
-                        )
-                    ) {}
                 }
 
                 // Quantity field
@@ -1283,12 +1275,18 @@ private fun EditMaterialDialog(
                             )
                         }
                     )
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null
+                            ) { categoryDropdownExpanded = !categoryDropdownExpanded }
+                    )
                     DropdownMenu(
                         expanded = categoryDropdownExpanded,
                         onDismissRequest = { categoryDropdownExpanded = false },
-                        modifier = Modifier
-                            .fillMaxWidth(0.9f)
-                            .heightIn(max = 240.dp)
+                        modifier = Modifier.heightIn(max = 240.dp)
                     ) {
                         categories.forEach { cat ->
                             DropdownMenuItem(
@@ -1300,15 +1298,6 @@ private fun EditMaterialDialog(
                             )
                         }
                     }
-                    Button(
-                        onClick = { categoryDropdownExpanded = true },
-                        modifier = Modifier
-                            .matchParentSize()
-                            .alpha(0f),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.Transparent
-                        )
-                    ) {}
                 }
 
                 // Quantity Stepper

@@ -8,9 +8,11 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -37,6 +39,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -178,42 +182,40 @@ private fun SummaryRow(
     categoriesUsed: Int,
     topCategory: String
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            SummaryCard(
-                modifier = Modifier.weight(1f),
-                label  = "Total entries",
-                value  = totalItems.toString(),
-                color  = PrimaryLight
-            )
-            SummaryCard(
-                modifier = Modifier.weight(1f),
-                label  = "Total units",
-                value  = totalUnits.toString(),
-                color  = CategoryFinelinersColor.darken(0.05f)
-            )
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            SummaryCard(
-                modifier = Modifier.weight(1f),
-                label  = "Categories",
-                value  = categoriesUsed.toString(),
-                color  = CategoryColoredPencilsColor.darken(0.08f)
-            )
-            SummaryCard(
-                modifier = Modifier.weight(1f),
-                label  = "Top category",
-                value  = topCategory,
-                color  = CategoryAlcoholMarkersColor.darken(0.08f),
-                smallText = true
-            )
-        }
+    // height(IntrinsicSize.Min) forces all four cards to measure at the same
+    // height — the height of the tallest one — so fillMaxHeight() inside each
+    // card actually works and every card is perfectly uniform.
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(IntrinsicSize.Min),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment     = Alignment.CenterVertically
+    ) {
+        SummaryCard(
+            modifier = Modifier.weight(1f),
+            label    = "Total entries",
+            value    = totalItems.toString(),
+            color    = PrimaryLight
+        )
+        SummaryCard(
+            modifier = Modifier.weight(1f),
+            label    = "Total units",
+            value    = totalUnits.toString(),
+            color    = CategoryFinelinersColor.darken(0.05f)
+        )
+        SummaryCard(
+            modifier = Modifier.weight(1f),
+            label    = "Categories",
+            value    = categoriesUsed.toString(),
+            color    = CategoryColoredPencilsColor.darken(0.08f)
+        )
+        SummaryCard(
+            modifier = Modifier.weight(1f),
+            label    = "Top category",
+            value    = topCategory,
+            color    = CategoryAlcoholMarkersColor.darken(0.08f)
+        )
     }
 }
 
@@ -222,37 +224,38 @@ private fun SummaryCard(
     modifier: Modifier = Modifier,
     label: String,
     value: String,
-    color: Color,
-    smallText: Boolean = false
+    color: Color
 ) {
     Card(
-        modifier = modifier,
-        shape    = RoundedCornerShape(16.dp),
-        colors   = CardDefaults.cardColors(containerColor = color.copy(alpha = 0.28f)),
+        modifier  = modifier,
+        shape     = RoundedCornerShape(16.dp),
+        colors    = CardDefaults.cardColors(containerColor = color.copy(alpha = 0.28f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                // fillMaxHeight makes this column stretch to the Card's height,
+                // which is driven by the tallest sibling card in the Row.
+                .fillMaxHeight()
+                .padding(vertical = 14.dp, horizontal = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
             Text(
-                text       = value,
-                style      = if (smallText)
-                    MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                else
-                    MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.ExtraBold),
-                color      = OnBackgroundLight,
-                textAlign  = TextAlign.Center,
-                maxLines   = 2,
-                overflow   = TextOverflow.Ellipsis
+                text      = value,
+                style     = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
+                color     = OnBackgroundLight,
+                textAlign = TextAlign.Center,
+                maxLines  = 2,
+                overflow  = TextOverflow.Ellipsis
             )
-            Spacer(Modifier.height(2.dp))
+            Spacer(Modifier.height(4.dp))
             Text(
-                text  = label,
-                style = MaterialTheme.typography.labelSmall,
-                color = OnBackgroundLight.copy(alpha = 0.6f)
+                text      = label,
+                style     = MaterialTheme.typography.labelSmall,
+                color     = OnBackgroundLight.copy(alpha = 0.6f),
+                textAlign = TextAlign.Center
             )
         }
     }
@@ -304,59 +307,74 @@ private val LABEL_HEIGHT = 56.dp   // reserved below bars for rotated labels
 private fun BarChart(stats: List<CategoryStat>) {
     val maxUnits = stats.maxOf { it.units }.coerceAtLeast(1)
 
-    // One Animatable per bar, reset every time stats identity changes
+    // One Animatable per bar, all start at 0 — recreated whenever stats change
     val animatables = remember(stats) { stats.map { Animatable(0f) } }
-    // Use a separate key that changes on every composition of this screen visit
     LaunchedEffect(animatables) {
-        animatables.forEachIndexed { index, anim ->
-            anim.snapTo(0f)
-            anim.animateTo(
-                targetValue = 1f,
-                animationSpec = tween(
-                    durationMillis = 400,
-                    delayMillis    = index * 60
-                )
-            )
+        // Snap every bar to 0 first (guards against reuse with stale values)
+        animatables.forEach { it.snapTo(0f) }
+        // Animate all bars in parallel with a staggered delay.
+        // A small base delay (80 ms) ensures the first bar also visibly
+        // animates from zero rather than appearing to start mid-way.
+        coroutineScope {
+            animatables.mapIndexed { index, anim ->
+                async {
+                    anim.animateTo(
+                        targetValue = 1f,
+                        animationSpec = tween(
+                            durationMillis = 400,
+                            delayMillis    = 80 + index * 60
+                        )
+                    )
+                }
+            }.forEach { it.await() }
         }
     }
 
     val totalWidth = (BAR_WIDTH + BAR_SPACING) * stats.size + BAR_SPACING
 
     Row(
-        modifier            = Modifier.width(totalWidth),
-        horizontalArrangement = Arrangement.spacedBy(BAR_SPACING),
-        verticalAlignment   = Alignment.Bottom
+        modifier              = Modifier.width(totalWidth),
+        horizontalArrangement = Arrangement.spacedBy(BAR_SPACING)
     ) {
         stats.forEachIndexed { index, stat ->
             val animProgress = animatables[index].value
             val barColor     = getCategoryBarColor(stat.category)
+            val barHeightFraction = (stat.units.toFloat() / maxUnits) * animProgress
 
             Column(
                 modifier            = Modifier.width(BAR_WIDTH),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Bottom
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Unit count label above bar
-                Text(
-                    text  = stat.units.toString(),
-                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                    color = OnBackgroundLight
-                )
-                Spacer(Modifier.height(4.dp))
-
-                // Animated bar
-                val barHeightFraction = (stat.units.toFloat() / maxUnits) * animProgress
+                // Fixed-height area for the bar + its value label above it,
+                // anchored to the bottom so shorter bars sit on the baseline.
                 Box(
-                    modifier = Modifier
+                    modifier        = Modifier
                         .width(BAR_WIDTH)
-                        .height(CHART_HEIGHT * barHeightFraction.coerceAtLeast(0.04f))
-                        .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
-                        .background(barColor)
-                )
+                        .height(CHART_HEIGHT),
+                    contentAlignment = Alignment.BottomCenter
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        // Unit count label above bar
+                        Text(
+                            text  = stat.units.toString(),
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                            color = OnBackgroundLight
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        // Animated bar
+                        Box(
+                            modifier = Modifier
+                                .width(BAR_WIDTH)
+                                .height(CHART_HEIGHT * barHeightFraction.coerceAtLeast(0.04f))
+                                .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
+                                .background(barColor)
+                        )
+                    }
+                }
 
                 Spacer(Modifier.height(6.dp))
 
-                // Category label — truncated to 2 lines
+                // Category label — fixed height, 2 lines max
                 Text(
                     text      = stat.category,
                     style     = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
@@ -393,7 +411,7 @@ private fun LegendCard(stats: List<CategoryStat>) {
 
             stats.forEach { stat ->
                 LegendRow(stat = stat)
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(14.dp))
             }
         }
     }
@@ -403,51 +421,53 @@ private fun LegendCard(stats: List<CategoryStat>) {
 private fun LegendRow(stat: CategoryStat) {
     val barColor = getCategoryBarColor(stat.category)
 
-    Row(
-        modifier          = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // Colour dot
-        Box(
-            modifier = Modifier
-                .size(14.dp)
-                .clip(CircleShape)
-                .background(barColor)
-        )
-        Spacer(Modifier.width(10.dp))
-
-        // Category name
-        Text(
-            text     = stat.category,
-            style    = MaterialTheme.typography.bodyMedium,
-            color    = OnBackgroundLight,
-            modifier = Modifier.weight(1f)
-        )
-
-        // Progress bar + count
-        Box(
-            modifier = Modifier
-                .weight(1.5f)
-                .height(18.dp)
-                .clip(RoundedCornerShape(9.dp))
-                .background(barColor.copy(alpha = 0.25f))
+    Column(modifier = Modifier.fillMaxWidth()) {
+        // Top line: colour dot + category name + unit count
+        Row(
+            modifier          = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier
-                    .fillMaxSize(stat.percentage / 100f)
-                    .clip(RoundedCornerShape(9.dp))
+                    .size(10.dp)
+                    .clip(CircleShape)
+                    .background(barColor)
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text     = stat.category,
+                style    = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+                color    = OnBackgroundLight,
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text  = "${stat.units} units · ${stat.percentage.toInt()}%",
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                color = OnBackgroundLight.copy(alpha = 0.6f)
+            )
+        }
+
+        Spacer(Modifier.height(6.dp))
+
+        // Progress bar — track + filled portion, width-only fill
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(8.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .background(barColor.copy(alpha = 0.20f))
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(stat.percentage / 100f)
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(4.dp))
                     .background(barColor)
             )
         }
-        Spacer(Modifier.width(8.dp))
-
-        Text(
-            text  = "${stat.units} units (${stat.percentage.toInt()}%)",
-            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-            color = OnBackgroundLight,
-            modifier = Modifier.width(84.dp),
-            textAlign = TextAlign.End
-        )
     }
 }
 
