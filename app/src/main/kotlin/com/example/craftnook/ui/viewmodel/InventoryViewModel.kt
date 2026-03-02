@@ -35,7 +35,11 @@ import javax.inject.Inject
 data class CategoryStat(
     val category: String,
     val units: Int,
-    val percentage: Float
+    val percentage: Float,
+    /** Display label for the unit. When all materials in this category share the
+     *  same unit string that unit is used (e.g. "markers", "tubes"); otherwise
+     *  falls back to the generic "units". */
+    val unitLabel: String = "units"
 )
 
 /**
@@ -160,10 +164,13 @@ class InventoryViewModel @Inject constructor(
             } else {
                 categories
                     .map { category ->
-                        val units = materials
-                            .filter { it.category == category }
-                            .sumOf { it.quantity }
-                        CategoryStat(category, units, (units.toFloat() / totalUnits) * 100f)
+                        val categoryMaterials = materials.filter { it.category == category }
+                        val units = categoryMaterials.sumOf { it.quantity }
+                        // Use the shared unit name if every item in this category has the
+                        // same unit string; otherwise fall back to the generic "units".
+                        val distinctUnits = categoryMaterials.map { it.unit.trim().lowercase() }.toSet()
+                        val unitLabel = if (distinctUnits.size == 1) categoryMaterials.first().unit.trim() else "units"
+                        CategoryStat(category, units, (units.toFloat() / totalUnits) * 100f, unitLabel)
                     }
                     .filter { it.units > 0 }
                     .sortedByDescending { it.units }

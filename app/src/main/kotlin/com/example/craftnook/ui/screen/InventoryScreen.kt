@@ -768,33 +768,6 @@ private fun InventoryItemCard(
 }
 
 /**
- * Maps category names to Material Icons
- */
-private fun getCategoryIcon(category: String) = when (category) {
-    "Paint" -> Icons.Filled.Palette
-    "Brushes" -> Icons.Filled.Brush
-    "Paper" -> Icons.Filled.Note
-    "Pens" -> Icons.Filled.Edit
-    "Alcohol Markers" -> Icons.Filled.Edit
-    "Water-based Markers" -> Icons.Filled.Edit
-    "Colored Pencils" -> Icons.Filled.Edit
-    "Drawing Pencils" -> Icons.Filled.Edit
-    "Mechanical Pencil Leads" -> Icons.Filled.Edit
-    "Mechanical Pencils" -> Icons.Filled.Edit
-    "White Pens" -> Icons.Filled.Edit
-    "Glitter Pens" -> Icons.Filled.Edit
-    "Metallic Pens" -> Icons.Filled.Edit
-    "Crayons" -> Icons.Filled.Edit
-    "Highlighters" -> Icons.Filled.Highlight
-    "A4 Notebooks" -> Icons.Filled.Note
-    "A5 Notebooks" -> Icons.Filled.Note
-    "Fountain Pen Cartridges" -> Icons.Filled.Edit
-    "Fineliners" -> Icons.Filled.Edit
-    "Erasers" -> Icons.Filled.Edit
-    else -> Icons.Filled.Palette
-}
-
-/**
  * Category Badge
  * Shows the category of the material in a styled chip with premium pastel colors.
  * In compact mode (used in grid cards) shows only the icon to save space.
