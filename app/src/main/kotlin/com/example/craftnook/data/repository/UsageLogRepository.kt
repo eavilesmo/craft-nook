@@ -15,6 +15,9 @@ interface IUsageLogRepository {
 
     /** Delete every log entry. */
     suspend fun clearAllLogs()
+
+    /** Delete a single log entry by ID. Does not affect inventory quantities. */
+    suspend fun deleteLogById(id: String)
 }
 
 // ── Room implementation ──────────────────────────────────────────────────────
@@ -31,4 +34,7 @@ class RoomUsageLogRepository(
 
     override suspend fun clearAllLogs() =
         usageLogDao.deleteAll()
+
+    override suspend fun deleteLogById(id: String) =
+        usageLogDao.deleteById(id)
 }

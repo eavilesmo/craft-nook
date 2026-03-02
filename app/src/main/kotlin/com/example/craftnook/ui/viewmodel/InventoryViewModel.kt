@@ -17,9 +17,12 @@ import com.example.craftnook.data.util.isInternalImagePath
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.emptyFlow
@@ -40,17 +43,6 @@ data class CategoryStat(
      *  same unit string that unit is used (e.g. "markers", "tubes"); otherwise
      *  falls back to the generic "units". */
     val unitLabel: String = "units"
-)
-
-/**
- * Holds context for a pending quantity-reduction edit so the UI can ask
- * "Did you use this material, or are you correcting a mistake?" before
- * committing the log entry.
- */
-data class PendingQuantityConfirmation(
-    val material: ArtMaterial,
-    val oldQuantity: Int,
-    val newQuantity: Int
 )
 
 /** Outcome of a backup export or import operation, shown to the user as a snackbar. */
@@ -202,15 +194,6 @@ class InventoryViewModel @Inject constructor(
                 initialValue = emptyList()
             )
 
-    /**
-     * Set when a quantity-reducing edit is saved. The UI observes this to
-     * show the "Did you use this / Just correcting?" dialog.
-     * Cleared by [confirmQuantityChange].
-     */
-    private val _pendingQuantityConfirmation = MutableStateFlow<PendingQuantityConfirmation?>(null)
-    val pendingQuantityConfirmation: StateFlow<PendingQuantityConfirmation?> =
-        _pendingQuantityConfirmation.asStateFlow()
-
     // ── Loading / error state ────────────────────────────────────────────────
 
     private val _isLoading = MutableStateFlow(false)
@@ -263,10 +246,41 @@ class InventoryViewModel @Inject constructor(
 
     // ── Journal actions ──────────────────────────────────────────────────────
 
+    /**
+     * Emits the most recently deleted [UsageLog] so the UI can offer an Undo
+     * snackbar. Collecting the emission and calling [undoDeleteJournalEntry]
+     * re-inserts the row without touching inventory quantities.
+     */
+    private val _deletedLogEntry = MutableSharedFlow<UsageLog>(extraBufferCapacity = 1)
+    val deletedLogEntry: SharedFlow<UsageLog> = _deletedLogEntry.asSharedFlow()
+
     /** Delete every usage log entry. The [logEntries] Flow updates instantly. */
     fun clearJournal() {
         viewModelScope.launch {
             logRepository.clearAllLogs()
+        }
+    }
+
+    /**
+     * Delete a single journal entry by ID. Does NOT change any inventory
+     * quantity — it is purely a history record deletion.
+     * Emits the deleted entry via [deletedLogEntry] so the UI can offer Undo.
+     */
+    fun deleteJournalEntry(log: UsageLog) {
+        viewModelScope.launch {
+            logRepository.deleteLogById(log.id)
+            _deletedLogEntry.emit(log)
+        }
+    }
+
+    /**
+     * Re-insert a previously deleted log entry (Undo action).
+     * Uses IGNORE conflict strategy so re-inserting an already-present row
+     * is a no-op (safe to call twice).
+     */
+    fun undoDeleteJournalEntry(log: UsageLog) {
+        viewModelScope.launch {
+            logRepository.insertLog(log)
         }
     }
 
@@ -304,6 +318,7 @@ class InventoryViewModel @Inject constructor(
         brand: String,
         quantity: Int,
         category: String,
+        unit: String = "unit",
         imageUri: String? = null
     ) {
         viewModelScope.launch {
@@ -316,7 +331,7 @@ class InventoryViewModel @Inject constructor(
                     else copyImageToInternalStorage(context, Uri.parse(uriString)) ?: uriString
                 }
 
-                val result = materialRepository.addMaterial(name, brand, quantity, category, internalUri)
+                val result = materialRepository.addMaterial(name, brand, quantity, category, unit, internalUri)
                 result.onSuccess { material ->
                     writeLog(
                         material     = material,
@@ -373,10 +388,10 @@ class InventoryViewModel @Inject constructor(
      *
      * - If [material.photoUri] is a new `content://` URI it is copied to
      *   private storage and the old internal file (if any) is deleted.
-     * - If quantity increased → write RESTOCKED automatically.
-     * - If quantity decreased → surface [PendingQuantityConfirmation] so the UI
-     *   can ask the user whether this was real usage or a correction.
+     * - If quantity increased → write a RESTOCKED log entry automatically.
+     * - If quantity decreased → write a USED log entry automatically.
      * - If quantity unchanged → no log entry.
+     * No dialog is shown; the journal records the change silently.
      */
     fun updateMaterial(material: ArtMaterial) {
         viewModelScope.launch {
@@ -410,14 +425,12 @@ class InventoryViewModel @Inject constructor(
                             delta     = delta,
                             qtyAfter  = updatedMaterial.quantity
                         )
-                        delta < 0 -> {
-                            // Ask user: used or correction?
-                            _pendingQuantityConfirmation.value = PendingQuantityConfirmation(
-                                material    = updatedMaterial,
-                                oldQuantity = oldQty,
-                                newQuantity = updatedMaterial.quantity
-                            )
-                        }
+                        delta < 0 -> writeLog(
+                            material  = updatedMaterial,
+                            eventType = EventType.USED,
+                            delta     = delta,
+                            qtyAfter  = updatedMaterial.quantity
+                        )
                         // delta == 0 → no log entry needed
                     }
                 }
@@ -428,30 +441,6 @@ class InventoryViewModel @Inject constructor(
                 _isLoading.value = false
             }
         }
-    }
-
-    /**
-     * Called by the UI dialog after the user answers "Did you use this?"
-     *
-     * @param wasUsed true → USED event; false → RESTOCKED (correction) event.
-     */
-    fun confirmQuantityChange(wasUsed: Boolean) {
-        val pending = _pendingQuantityConfirmation.value ?: return
-        _pendingQuantityConfirmation.value = null
-        viewModelScope.launch {
-            val delta = pending.newQuantity - pending.oldQuantity  // negative
-            writeLog(
-                material  = pending.material,
-                eventType = if (wasUsed) EventType.USED else EventType.RESTOCKED,
-                delta     = delta,
-                qtyAfter  = pending.newQuantity
-            )
-        }
-    }
-
-    /** Dismiss the confirmation dialog without writing any log entry. */
-    fun dismissQuantityConfirmation() {
-        _pendingQuantityConfirmation.value = null
     }
 
     fun updateMaterialQuantity(materialId: String, newQuantity: Int) {

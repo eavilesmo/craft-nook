@@ -127,7 +127,6 @@ import com.example.craftnook.ui.theme.CategoryWhitePensColor
 import com.example.craftnook.ui.theme.OutlineLight
 import com.example.craftnook.ui.viewmodel.BackupResult
 import com.example.craftnook.ui.viewmodel.InventoryViewModel
-import com.example.craftnook.ui.viewmodel.PendingQuantityConfirmation
 import kotlinx.coroutines.launch
 
 /**
@@ -146,7 +145,6 @@ fun InventoryScreen(
     val searchQuery by viewModel.searchQuery.collectAsState()
     val selectedCategory by viewModel.selectedCategory.collectAsState()
     val availableCategories by viewModel.availableCategories.collectAsState()
-    val pendingConfirmation by viewModel.pendingQuantityConfirmation.collectAsState()
     val backupResult by viewModel.backupResult.collectAsState()
 
     var showAddMaterialDialog by remember { mutableStateOf(false) }
@@ -288,24 +286,14 @@ fun InventoryScreen(
                 fabPressed = false
                 pendingAddPhotoUri = null
             },
-            onAdd = { name, brand, quantity, category, imageUri ->
+            onAdd = { name, brand, quantity, category, unit, imageUri ->
                 quantity.toIntOrNull()?.let { quantityInt ->
-                    viewModel.addMaterial(name, brand, quantityInt, category, imageUri)
+                    viewModel.addMaterial(name, brand, quantityInt, category, unit, imageUri)
                 }
                 showAddMaterialDialog = false
                 fabPressed = false
                 pendingAddPhotoUri = null
             }
-        )
-    }
-
-    // "Used it / Just correcting?" dialog — shown when a quantity is reduced during edit
-    if (pendingConfirmation != null) {
-        QuantityReductionDialog(
-            confirmation = pendingConfirmation!!,
-            onUsed       = { viewModel.confirmQuantityChange(wasUsed = true) },
-            onCorrection = { viewModel.confirmQuantityChange(wasUsed = false) },
-            onDismiss    = { viewModel.dismissQuantityConfirmation() }
         )
     }
 
@@ -1000,13 +988,14 @@ private fun AddMaterialDialog(
     photoUri: String?,
     onPickPhoto: () -> Unit,
     onDismiss: () -> Unit,
-    onAdd: (name: String, brand: String, quantity: String, category: String, imageUri: String?) -> Unit
+    onAdd: (name: String, brand: String, quantity: String, category: String, unit: String, imageUri: String?) -> Unit
 ) {
     var name by remember { mutableStateOf("") }
     var brand by remember { mutableStateOf("") }
     var quantity by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf(categories.firstOrNull() ?: "") }
     var categoryDropdownExpanded by remember { mutableStateOf(false) }
+    var unit by remember { mutableStateOf("unit") }
     val context = LocalContext.current
 
     // Validation: name and quantity must be non-empty, category must be selected
@@ -1133,6 +1122,16 @@ private fun AddMaterialDialog(
                     placeholder = { Text("e.g., 10") }
                 )
 
+                // Unit field
+                OutlinedTextField(
+                    value = unit,
+                    onValueChange = { unit = it },
+                    label = { Text("Unit") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    placeholder = { Text("e.g., bottle, tube, sheet") }
+                )
+
                 Text(
                     text = "* Required fields",
                     style = MaterialTheme.typography.labelSmall,
@@ -1142,7 +1141,7 @@ private fun AddMaterialDialog(
         },
         confirmButton = {
             Button(
-                onClick = { onAdd(name, brand, quantity, selectedCategory, photoUri) },
+                onClick = { onAdd(name, brand, quantity, selectedCategory, unit, photoUri) },
                 enabled = isValid
             ) {
                 Text("Add")
@@ -1503,46 +1502,4 @@ private fun MaterialDetailsDialog(
     )
 }
 
-/**
- * Dialog shown when the user saves an edit that reduces quantity.
- * Asks whether the reduction represents real usage or a data correction.
- */
-@Composable
-private fun QuantityReductionDialog(
-    confirmation: PendingQuantityConfirmation,
-    onUsed: () -> Unit,
-    onCorrection: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    val delta = confirmation.oldQuantity - confirmation.newQuantity  // positive number
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Quantity reduced") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    text = "\"${confirmation.material.name}\" went from " +
-                           "${confirmation.oldQuantity} → ${confirmation.newQuantity} " +
-                           "(-$delta ${confirmation.material.unit}).",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = "Did you use this material, or are you correcting a mistake?",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-        },
-        confirmButton = {
-            Button(onClick = onUsed) {
-                Text("Used it")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onCorrection) {
-                Text("Just correcting")
-            }
-        }
-    )
-}
+

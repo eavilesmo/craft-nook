@@ -76,4 +76,8 @@ interface UsageLogDao {
 
     @Query("DELETE FROM usage_logs")
     suspend fun deleteAll()
+
+    /** Delete a single log entry by its primary key. */
+    @Query("DELETE FROM usage_logs WHERE id = :id")
+    suspend fun deleteById(id: String)
 }

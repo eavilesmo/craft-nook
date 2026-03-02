@@ -44,15 +44,22 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -77,6 +84,7 @@ import com.example.craftnook.ui.viewmodel.InventoryViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.launch
 
 // ── Colour + icon helpers ────────────────────────────────────────────────────
 
@@ -115,14 +123,21 @@ private val entryFormatter  = SimpleDateFormat("MMM d, HH:mm", Locale.getDefault
 private fun Long.toMonthKey(): String   = monthFormatter.format(Date(this))
 private fun Long.toEntryDate(): String  = entryFormatter.format(Date(this))
 
+// Wood-brown colour used for the per-entry delete icon.
+// Matches the app's OnBackgroundLight cocoa tone but slightly lighter/muted.
+private val WoodBrown = Color(0xFF8D6E63)
+
 // ── Screen ───────────────────────────────────────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun JournalScreen(viewModel: InventoryViewModel) {
-    val allLogs      by viewModel.logEntries.collectAsState()
-    var activeFilter by remember { mutableStateOf("All") }
+    val allLogs         by viewModel.logEntries.collectAsState()
+    var activeFilter    by remember { mutableStateOf("All") }
     var showClearDialog by remember { mutableStateOf(false) }
+
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope             = rememberCoroutineScope()
 
     val filteredLogs = if (activeFilter == "All") allLogs
                        else allLogs.filter { it.eventType == activeFilter }
@@ -130,6 +145,23 @@ fun JournalScreen(viewModel: InventoryViewModel) {
     // Group by month, preserving newest-first order
     val byMonth: Map<String, List<UsageLog>> = filteredLogs
         .groupBy { it.timestamp.toMonthKey() }
+
+    // Collect single-entry deletions and show an Undo snackbar.
+    // Re-inserting via undoDeleteJournalEntry does not touch inventory quantities.
+    LaunchedEffect(Unit) {
+        viewModel.deletedLogEntry.collect { deleted ->
+            scope.launch {
+                val result = snackbarHostState.showSnackbar(
+                    message        = "Entry removed",
+                    actionLabel    = "Undo",
+                    duration       = SnackbarDuration.Short
+                )
+                if (result == SnackbarResult.ActionPerformed) {
+                    viewModel.undoDeleteJournalEntry(deleted)
+                }
+            }
+        }
+    }
 
     // ── Clear history confirmation dialog ────────────────────────────────────
     if (showClearDialog) {
@@ -201,6 +233,17 @@ fun JournalScreen(viewModel: InventoryViewModel) {
                 )
             )
         },
+        snackbarHost = {
+            SnackbarHost(hostState = snackbarHostState) { data ->
+                Snackbar(
+                    snackbarData    = data,
+                    shape           = RoundedCornerShape(12.dp),
+                    containerColor  = OnBackgroundLight,
+                    contentColor    = Color.White,
+                    actionColor     = PrimaryLight
+                )
+            }
+        },
         containerColor = BackgroundLight
     ) { padding ->
         Column(
@@ -255,7 +298,11 @@ fun JournalScreen(viewModel: InventoryViewModel) {
                 ) {
                     byMonth.forEach { (month, entries) ->
                         item(key = month) {
-                            MonthSection(month = month, entries = entries)
+                            MonthSection(
+                                month    = month,
+                                entries  = entries,
+                                onDelete = { log -> viewModel.deleteJournalEntry(log) }
+                            )
                             Spacer(Modifier.height(4.dp))
                         }
                     }
@@ -265,24 +312,56 @@ fun JournalScreen(viewModel: InventoryViewModel) {
     }
 }
 
+// ── Summary badge colours ────────────────────────────────────────────────────
+
+private val SummaryGreenText = Color(0xFF2E7D32)       // Dark green text
+private val SummaryGreenBg   = Color(0xFFE8F5E9)       // Faint green pill background
+private val SummaryRedText   = Color(0xFFC62828)        // Strong red text
+private val SummaryRedBg     = Color(0xFFFFEBEE)        // Faint red pill background
+private val SummaryGrayText  = Color(0xFF6D4C41)        // Muted brown for deleted
+private val SummaryGrayBg    = Color(0xFFF3E5F5)        // Faint purple-grey for deleted
+
+@Composable
+private fun SummaryBadge(count: Int, label: String, textColor: Color, bgColor: Color) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(bgColor)
+            .padding(horizontal = 8.dp, vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(3.dp)
+    ) {
+        Text(
+            text       = count.toString(),
+            style      = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
+            color      = textColor,
+            fontSize   = 11.sp
+        )
+        Text(
+            text       = label,
+            style      = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
+            color      = textColor,
+            fontSize   = 11.sp
+        )
+    }
+}
+
 // ── Month section (collapsible) ──────────────────────────────────────────────
 
 @Composable
-private fun MonthSection(month: String, entries: List<UsageLog>) {
+private fun MonthSection(
+    month:    String,
+    entries:  List<UsageLog>,
+    onDelete: (UsageLog) -> Unit
+) {
     var expanded by remember(month) { mutableStateOf(true) }
 
-    // Build summary line
-    val added    = entries.count { it.eventType == EventType.ADDED }
-    val used     = entries.count { it.eventType == EventType.USED }
+    val added     = entries.count { it.eventType == EventType.ADDED }
     val restocked = entries.count { it.eventType == EventType.RESTOCKED }
-    val deleted  = entries.count { it.eventType == EventType.DELETED }
-    val summaryParts = buildList {
-        if (added     > 0) add("+$added added")
-        if (restocked > 0) add("+$restocked restocked")
-        if (used      > 0) add("−$used used")
-        if (deleted   > 0) add("$deleted deleted")
-    }
-    val summary = summaryParts.joinToString(" · ")
+    val used      = entries.count { it.eventType == EventType.USED }
+    val deleted   = entries.count { it.eventType == EventType.DELETED }
+
+    val hasSummary = added > 0 || restocked > 0 || used > 0 || deleted > 0
 
     Column {
         // Month header row
@@ -302,12 +381,32 @@ private fun MonthSection(month: String, entries: List<UsageLog>) {
                     style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                     color = OnBackgroundLight
                 )
-                if (summary.isNotBlank()) {
-                    Text(
-                        text  = summary,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = OnBackgroundLight.copy(alpha = 0.6f)
-                    )
+                if (hasSummary) {
+                    Spacer(Modifier.height(5.dp))
+                    Row(
+                        verticalAlignment    = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
+                        // Green group: added + restocked
+                        if (added > 0) SummaryBadge(added, "added", SummaryGreenText, SummaryGreenBg)
+                        if (restocked > 0) SummaryBadge(restocked, "restocked", SummaryGreenText, SummaryGreenBg)
+
+                        // Pipe separator between green and red groups
+                        if ((added > 0 || restocked > 0) && (used > 0 || deleted > 0)) {
+                            Text(
+                                text  = "|",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = OnBackgroundLight.copy(alpha = 0.25f),
+                                fontSize = 11.sp
+                            )
+                        }
+
+                        // Red group: used
+                        if (used > 0) SummaryBadge(used, "used", SummaryRedText, SummaryRedBg)
+
+                        // Muted group: deleted
+                        if (deleted > 0) SummaryBadge(deleted, "deleted", SummaryGrayText, SummaryGrayBg)
+                    }
                 }
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -337,7 +436,7 @@ private fun MonthSection(month: String, entries: List<UsageLog>) {
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 entries.forEach { log ->
-                    LogEntryCard(log = log)
+                    LogEntryCard(log = log, onDelete = { onDelete(log) })
                 }
             }
         }
@@ -349,7 +448,7 @@ private fun MonthSection(month: String, entries: List<UsageLog>) {
 // ── Individual log entry card ────────────────────────────────────────────────
 
 @Composable
-private fun LogEntryCard(log: UsageLog) {
+private fun LogEntryCard(log: UsageLog, onDelete: () -> Unit) {
     val style = eventStyle(log.eventType)
     val deltaStr = when {
         log.quantityDelta > 0 -> "+${log.quantityDelta}"
@@ -423,7 +522,7 @@ private fun LogEntryCard(log: UsageLog) {
                 )
             }
 
-            Spacer(Modifier.width(10.dp))
+            Spacer(Modifier.width(4.dp))
 
             // Delta badge
             Box(
@@ -440,6 +539,19 @@ private fun LogEntryCard(log: UsageLog) {
                         fontSize   = 14.sp
                     ),
                     color = style.color
+                )
+            }
+
+            // Delete icon — subtle wood-brown trash can
+            IconButton(
+                onClick  = onDelete,
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(
+                    imageVector        = Icons.Filled.Delete,
+                    contentDescription = "Delete entry",
+                    tint               = WoodBrown.copy(alpha = 0.55f),
+                    modifier           = Modifier.size(18.dp)
                 )
             }
         }
