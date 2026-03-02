@@ -4,7 +4,6 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
@@ -36,6 +35,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -60,8 +60,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -89,6 +87,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -127,6 +127,7 @@ import com.example.craftnook.ui.theme.CategoryWhitePensColor
 import com.example.craftnook.ui.theme.OutlineLight
 import com.example.craftnook.ui.viewmodel.BackupResult
 import com.example.craftnook.ui.viewmodel.InventoryViewModel
+import com.example.craftnook.ui.viewmodel.StockFilter
 import kotlinx.coroutines.launch
 
 /**
@@ -144,6 +145,7 @@ fun InventoryScreen(
     val filteredMaterials by viewModel.filteredMaterials.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     val selectedCategory by viewModel.selectedCategory.collectAsState()
+    val selectedStockFilter by viewModel.selectedStockFilter.collectAsState()
     val availableCategories by viewModel.availableCategories.collectAsState()
     val backupResult by viewModel.backupResult.collectAsState()
 
@@ -227,14 +229,16 @@ fun InventoryScreen(
                     .padding(horizontal = 20.dp, vertical = 12.dp)
             )
 
-            // Category filter chips
-            CategoryFilterRow(
+            // Dropdown filter row (category + stock status)
+            FilterDropdownBar(
                 categories = availableCategories,
                 selectedCategory = selectedCategory,
                 onCategorySelected = { viewModel.selectCategory(it) },
+                selectedStockFilter = selectedStockFilter,
+                onStockFilterSelected = { viewModel.selectStockFilter(it) },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 12.dp)
+                    .padding(horizontal = 16.dp, vertical = 6.dp)
             )
 
             // Materials list
@@ -333,75 +337,161 @@ private fun SearchBar(
         modifier = modifier,
         placeholder = { Text("Search materials...") },
         singleLine = true,
-        shape = RoundedCornerShape(16.dp)
+        shape = RoundedCornerShape(16.dp),
+        colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+            unfocusedContainerColor = Color(0xFFFFFFFF),
+            focusedContainerColor   = Color(0xFFFFFFFF),
+            unfocusedBorderColor    = Color(0xFFD7CCC8),
+            focusedBorderColor      = MaterialTheme.colorScheme.primary
+        )
     )
 }
 
 /**
- * Category Filter Row
- * Row of FilterChips for category filtering with smooth selection animation
+ * Filter bar — two equal-width dropdown menus side by side.
+ * Left: Category selector.  Right: Stock-status selector.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun CategoryFilterRow(
+private fun FilterDropdownBar(
     categories: List<String>,
     selectedCategory: String,
     onCategorySelected: (String) -> Unit,
+    selectedStockFilter: StockFilter,
+    onStockFilterSelected: (StockFilter) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val allCategories = listOf("All") + categories
-    
-    // Function to get pastel color for category
-    fun getCategoryColor(category: String): Color = when (category) {
-        "Paint" -> CategoryPaintColor
-        "Brushes" -> CategoryBrushesColor
-        "Paper" -> CategoryPaperColor
-        "Pens" -> CategoryPensColor
-        "Alcohol Markers" -> CategoryAlcoholMarkersColor
-        "Water-based Markers" -> CategoryWaterbasedMarkersColor
-        "Colored Pencils" -> CategoryColoredPencilsColor
-        "Drawing Pencils" -> CategoryDrawingPencilsColor
-        "Mechanical Pencil Leads" -> CategoryMechanicalPencilLeadsColor
-        "Mechanical Pencils" -> CategoryMechanicalPencilsColor
-        "White Pens" -> CategoryWhitePensColor
-        "Glitter Pens" -> CategoryGlitterPensColor
-        "Metallic Pens" -> CategoryMetallicPensColor
-        "Crayons" -> CategoryCrayonsColor
-        "Highlighters" -> CategoryHighlightersColor
-        "A4 Notebooks" -> CategoryA4NotebooksColor
-        "A5 Notebooks" -> CategoryA5NotebooksColor
-        "Fountain Pen Cartridges" -> CategoryFountainPenCartridgesColor
-        "Fineliners" -> CategoryFinelinersColor
-        "All" -> Color(0xFFE8E8E8) // Light gray for "All"
-        else -> Color(0xFFE0E0E0) // Default light gray
-    }
+    // Anchor styling constants
+    val anchorBg     = Color(0xFFFFF3E0) // warm beige — one step richer than BackgroundLight
+    val anchorBorder = Color(0xFFD7CCC8) // OutlineVariantLight
+    val anchorShape  = RoundedCornerShape(14.dp)
+    val labelColor   = Color(0xFF5D4037) // OnBackgroundLight
 
-    androidx.compose.foundation.lazy.LazyRow(
+    val stockOptions = listOf(
+        StockFilter.ALL      to "All",
+        StockFilter.IN_STOCK to "In Stock",
+        StockFilter.FINISHED to "Finished"
+    )
+    val stockLabel = stockOptions.first { it.first == selectedStockFilter }.second
+
+    Row(
         modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        contentPadding = PaddingValues(0.dp)
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        items(allCategories) { category ->
-            AnimatedContent(
-                targetState = selectedCategory == category,
-                label = "filterChipAnimation"
-            ) { isSelected ->
-                FilterChip(
-                    selected = isSelected,
-                    onClick = { onCategorySelected(category) },
-                    label = { Text(category) },
-                    modifier = Modifier.graphicsLayer {
-                        scaleX = if (isSelected) 1.0f else 0.95f
-                        scaleY = if (isSelected) 1.0f else 0.95f
+        // ── Left: Category dropdown ──────────────────────────────────────
+        NookDropdown(
+            label = if (selectedCategory == "All") "Category" else selectedCategory,
+            anchorBg = anchorBg,
+            anchorBorder = anchorBorder,
+            anchorShape = anchorShape,
+            labelColor = labelColor,
+            modifier = Modifier.weight(1f)
+        ) { closeMenu ->
+            val sortedCategories = (listOf("All") + categories.sorted())
+            sortedCategories.forEach { cat ->
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            text = cat,
+                            fontWeight = if (cat == selectedCategory) FontWeight.Bold else FontWeight.Normal,
+                            color = if (cat == selectedCategory)
+                                MaterialTheme.colorScheme.primary else labelColor
+                        )
                     },
-                    colors = FilterChipDefaults.filterChipColors(
-                        containerColor = getCategoryColor(category),
-                        labelColor = Color(0xFF3F3F3F),
-                        selectedContainerColor = MaterialTheme.colorScheme.primary,
-                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary
-                    )
+                    onClick = {
+                        onCategorySelected(cat)
+                        closeMenu()
+                    }
                 )
             }
+        }
+
+        // ── Right: Stock-status dropdown ─────────────────────────────────
+        NookDropdown(
+            label = stockLabel,
+            anchorBg = anchorBg,
+            anchorBorder = anchorBorder,
+            anchorShape = anchorShape,
+            labelColor = labelColor,
+            modifier = Modifier.weight(1f)
+        ) { closeMenu ->
+            stockOptions.forEach { (filter, label) ->
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            text = label,
+                            fontWeight = if (filter == selectedStockFilter) FontWeight.Bold else FontWeight.Normal,
+                            color = if (filter == selectedStockFilter)
+                                MaterialTheme.colorScheme.primary else labelColor
+                        )
+                    },
+                    onClick = {
+                        onStockFilterSelected(filter)
+                        closeMenu()
+                    }
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Reusable Nook-styled dropdown anchor + menu.
+ * [content] receives a `closeMenu` lambda so item click handlers can close the menu.
+ */
+@Composable
+private fun NookDropdown(
+    label: String,
+    anchorBg: Color,
+    anchorBorder: Color,
+    anchorShape: RoundedCornerShape,
+    labelColor: Color,
+    modifier: Modifier = Modifier,
+    content: @Composable (closeMenu: () -> Unit) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Box(modifier = modifier) {
+        // Anchor
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(anchorShape)
+                .background(anchorBg)
+                .border(1.dp, anchorBorder, anchorShape)
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null
+                ) { expanded = !expanded }
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+                color = labelColor,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+            Icon(
+                imageVector = Icons.Filled.ArrowDropDown,
+                contentDescription = null,
+                tint = labelColor,
+                modifier = Modifier
+                    .size(20.dp)
+                    .graphicsLayer { rotationZ = if (expanded) 180f else 0f }
+            )
+        }
+
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.heightIn(max = 280.dp)
+        ) {
+            content { expanded = false }
         }
     }
 }
@@ -568,9 +658,10 @@ private fun InventoryItemCard(
     var showDeleteConfirmation by remember { mutableStateOf(false) }
     var showEditDialog by remember { mutableStateOf(false) }
 
-    val cardShape = RoundedCornerShape(20.dp)
+    val cardShape  = RoundedCornerShape(20.dp)
     val photoShape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
-    val context = LocalContext.current
+    val context    = LocalContext.current
+    val isFinished = material.quantity == 0
 
     Card(
         modifier = modifier
@@ -606,6 +697,9 @@ private fun InventoryItemCard(
                             .build(),
                         contentDescription = material.name,
                         contentScale = ContentScale.Crop,
+                        colorFilter = if (isFinished)
+                            ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(0f) })
+                        else null,
                         modifier = Modifier.fillMaxSize()
                     )
                 } else {
@@ -613,14 +707,34 @@ private fun InventoryItemCard(
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(Color(0xFFF5F0EB)),
+                            .background(if (isFinished) Color(0xFFEEEEEE) else Color(0xFFF5F0EB)),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Filled.Eco,
                             contentDescription = null,
                             modifier = Modifier.size(36.dp),
-                            tint = Color(0xFFBCAAA4)
+                            tint = if (isFinished) Color(0xFFBDBDBD) else Color(0xFFBCAAA4)
+                        )
+                    }
+                }
+
+                // 'Finished!' ribbon — top-right corner when qty == 0
+                if (isFinished) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(top = 6.dp, end = 6.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color(0xFF616161).copy(alpha = 0.82f))
+                            .padding(horizontal = 5.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text       = "Finished!",
+                            color      = Color.White,
+                            fontSize   = 8.sp,
+                            fontWeight = FontWeight.Medium,
+                            maxLines   = 1
                         )
                     }
                 }
@@ -700,12 +814,12 @@ private fun InventoryItemCard(
                         imageVector = getCategoryIcon(material.category),
                         contentDescription = material.category,
                         modifier = Modifier.size(12.dp),
-                        tint = Color(0xFF8D6E63)
+                        tint = if (isFinished) Color(0xFFBDBDBD) else Color(0xFF8D6E63)
                     )
                     Text(
                         text = "${material.quantity} ${material.unit}",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = if (isFinished) Color(0xFFBDBDBD) else MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 9.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis

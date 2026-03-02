@@ -7,7 +7,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,8 +19,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -32,14 +29,11 @@ import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.MenuBook
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -78,8 +72,7 @@ import com.example.craftnook.ui.theme.ErrorLight
 import com.example.craftnook.ui.theme.OnBackgroundLight
 import com.example.craftnook.ui.theme.PrimaryContainerLight
 import com.example.craftnook.ui.theme.PrimaryLight
-import com.example.craftnook.ui.theme.CategoryWaterbasedMarkersColor
-import com.example.craftnook.ui.theme.CategoryColoredPencilsColor
+
 import com.example.craftnook.ui.viewmodel.InventoryViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -95,24 +88,9 @@ private data class EventStyle(
 )
 
 private fun eventStyle(eventType: String): EventStyle = when (eventType) {
-    EventType.ADDED     -> EventStyle(PrimaryLight,                          Icons.Filled.Add,           "Added")
-    EventType.RESTOCKED -> EventStyle(CategoryWaterbasedMarkersColor,         Icons.Filled.Refresh,       "Restocked")
-    EventType.USED      -> EventStyle(CategoryColoredPencilsColor,            Icons.Filled.Remove,        "Used")
-    EventType.DELETED   -> EventStyle(ErrorLight,                             Icons.Filled.Delete,        "Deleted")
-    else                -> EventStyle(Color.Gray,                             Icons.Filled.BookmarkAdded, eventType)
-}
-
-// ── Filter chips definition ──────────────────────────────────────────────────
-
-private val ALL_FILTERS = listOf("All", EventType.ADDED, EventType.RESTOCKED, EventType.USED, EventType.DELETED)
-
-private fun filterLabel(filter: String) = when (filter) {
-    "All"              -> "All"
-    EventType.ADDED    -> "Added"
-    EventType.RESTOCKED -> "Restocked"
-    EventType.USED     -> "Used"
-    EventType.DELETED  -> "Deleted"
-    else               -> filter
+    EventType.ADDED -> EventStyle(PrimaryLight,   Icons.Filled.Add,    "Added")
+    EventType.USED  -> EventStyle(ErrorLight,     Icons.Filled.Remove, "Used")
+    else            -> EventStyle(Color.Gray,     Icons.Filled.BookmarkAdded, eventType)
 }
 
 // ── Date formatters ──────────────────────────────────────────────────────────
@@ -133,17 +111,13 @@ private val WoodBrown = Color(0xFF8D6E63)
 @Composable
 fun JournalScreen(viewModel: InventoryViewModel) {
     val allLogs         by viewModel.logEntries.collectAsState()
-    var activeFilter    by remember { mutableStateOf("All") }
     var showClearDialog by remember { mutableStateOf(false) }
 
     val snackbarHostState = remember { SnackbarHostState() }
     val scope             = rememberCoroutineScope()
 
-    val filteredLogs = if (activeFilter == "All") allLogs
-                       else allLogs.filter { it.eventType == activeFilter }
-
     // Group by month, preserving newest-first order
-    val byMonth: Map<String, List<UsageLog>> = filteredLogs
+    val byMonth: Map<String, List<UsageLog>> = allLogs
         .groupBy { it.timestamp.toMonthKey() }
 
     // Collect single-entry deletions and show an Undo snackbar.
@@ -251,40 +225,8 @@ fun JournalScreen(viewModel: InventoryViewModel) {
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // Filter chips
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp, vertical = 10.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                ALL_FILTERS.forEach { filter ->
-                    val selected = filter == activeFilter
-                    val style    = if (filter == "All") null else eventStyle(filter)
-                    FilterChip(
-                        selected = selected,
-                        onClick  = { activeFilter = filter },
-                        label    = { Text(filterLabel(filter), fontSize = 13.sp) },
-                        leadingIcon = if (style != null) ({
-                            Icon(
-                                imageVector        = style.icon,
-                                contentDescription = null,
-                                modifier           = Modifier.size(16.dp),
-                                tint               = if (selected) Color.White else style.color
-                            )
-                        }) else null,
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor     = style?.color ?: PrimaryLight,
-                            selectedLabelColor         = Color.White,
-                            selectedLeadingIconColor   = Color.White
-                        )
-                    )
-                }
-            }
-
-            if (filteredLogs.isEmpty()) {
-                EmptyJournalState(filtered = activeFilter != "All")
+            if (allLogs.isEmpty()) {
+                EmptyJournalState()
             } else {
                 LazyColumn(
                     modifier            = Modifier.fillMaxSize(),
@@ -314,12 +256,10 @@ fun JournalScreen(viewModel: InventoryViewModel) {
 
 // ── Summary badge colours ────────────────────────────────────────────────────
 
-private val SummaryGreenText = Color(0xFF2E7D32)       // Dark green text
-private val SummaryGreenBg   = Color(0xFFE8F5E9)       // Faint green pill background
-private val SummaryRedText   = Color(0xFFC62828)        // Strong red text
-private val SummaryRedBg     = Color(0xFFFFEBEE)        // Faint red pill background
-private val SummaryGrayText  = Color(0xFF6D4C41)        // Muted brown for deleted
-private val SummaryGrayBg    = Color(0xFFF3E5F5)        // Faint purple-grey for deleted
+private val SummaryGreenText = Color(0xFF2E7D32)
+private val SummaryGreenBg   = Color(0xFFE8F5E9)
+private val SummaryRedText   = Color(0xFFC62828)
+private val SummaryRedBg     = Color(0xFFFFEBEE)
 
 @Composable
 private fun SummaryBadge(count: Int, label: String, textColor: Color, bgColor: Color) {
@@ -356,12 +296,10 @@ private fun MonthSection(
 ) {
     var expanded by remember(month) { mutableStateOf(true) }
 
-    val added     = entries.count { it.eventType == EventType.ADDED }
-    val restocked = entries.count { it.eventType == EventType.RESTOCKED }
-    val used      = entries.count { it.eventType == EventType.USED }
-    val deleted   = entries.count { it.eventType == EventType.DELETED }
+    val added = entries.count { it.eventType == EventType.ADDED }
+    val used  = entries.count { it.eventType == EventType.USED }
 
-    val hasSummary = added > 0 || restocked > 0 || used > 0 || deleted > 0
+    val hasSummary = added > 0 || used > 0
 
     Column {
         // Month header row
@@ -387,12 +325,11 @@ private fun MonthSection(
                         verticalAlignment    = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(5.dp)
                     ) {
-                        // Green group: added + restocked
+                        // Green group: added
                         if (added > 0) SummaryBadge(added, "added", SummaryGreenText, SummaryGreenBg)
-                        if (restocked > 0) SummaryBadge(restocked, "restocked", SummaryGreenText, SummaryGreenBg)
 
-                        // Pipe separator between green and red groups
-                        if ((added > 0 || restocked > 0) && (used > 0 || deleted > 0)) {
+                        // Pipe separator
+                        if (added > 0 && used > 0) {
                             Text(
                                 text  = "|",
                                 style = MaterialTheme.typography.labelSmall,
@@ -403,9 +340,6 @@ private fun MonthSection(
 
                         // Red group: used
                         if (used > 0) SummaryBadge(used, "used", SummaryRedText, SummaryRedBg)
-
-                        // Muted group: deleted
-                        if (deleted > 0) SummaryBadge(deleted, "deleted", SummaryGrayText, SummaryGrayBg)
                     }
                 }
             }
@@ -561,7 +495,7 @@ private fun LogEntryCard(log: UsageLog, onDelete: () -> Unit) {
 // ── Empty state ──────────────────────────────────────────────────────────────
 
 @Composable
-private fun EmptyJournalState(filtered: Boolean) {
+private fun EmptyJournalState() {
     Column(
         modifier            = Modifier
             .fillMaxSize()
@@ -577,17 +511,14 @@ private fun EmptyJournalState(filtered: Boolean) {
         )
         Spacer(Modifier.height(16.dp))
         Text(
-            text      = if (filtered) "No entries for this filter" else "Your journal is empty",
+            text      = "Your journal is empty",
             style     = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
             color     = OnBackgroundLight,
             textAlign = TextAlign.Center
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            text      = if (filtered)
-                "Try selecting a different event type above."
-            else
-                "Start tracking by adding or editing materials in your inventory.",
+            text      = "Start tracking by adding or editing materials in your inventory.",
             style     = MaterialTheme.typography.bodyMedium,
             color     = OnBackgroundLight.copy(alpha = 0.55f),
             textAlign = TextAlign.Center

@@ -34,6 +34,9 @@ import javax.inject.Inject
 
 // ── Supporting data classes ──────────────────────────────────────────────────
 
+/** Controls the stock-status filter on the Inventory screen. */
+enum class StockFilter { ALL, IN_STOCK, FINISHED }
+
 /** Per-category statistics used by the Stats screen. */
 data class CategoryStat(
     val category: String,
@@ -119,6 +122,9 @@ class InventoryViewModel @Inject constructor(
     private val _selectedCategory = MutableStateFlow("All")
     val selectedCategory: StateFlow<String> = _selectedCategory.asStateFlow()
 
+    private val _selectedStockFilter = MutableStateFlow(StockFilter.ALL)
+    val selectedStockFilter: StateFlow<StockFilter> = _selectedStockFilter.asStateFlow()
+
     /**
      * Live, alphabetically sorted list of categories from Room.
      * The DAO orders the query by name ASC, so this is always A→Z.
@@ -133,7 +139,8 @@ class InventoryViewModel @Inject constructor(
 
     val filteredMaterials: StateFlow<List<ArtMaterial>> = allMaterials
         .combine(_searchQuery) { materials, query ->
-            materials.filter { material ->
+            if (query.isBlank()) materials
+            else materials.filter { material ->
                 material.name.contains(query, ignoreCase = true) ||
                 material.description.contains(query, ignoreCase = true)
             }
@@ -141,6 +148,13 @@ class InventoryViewModel @Inject constructor(
         .combine(_selectedCategory) { searchResults, category ->
             if (category == "All") searchResults
             else searchResults.filter { it.category == category }
+        }
+        .combine(_selectedStockFilter) { categoryResults, stockFilter ->
+            when (stockFilter) {
+                StockFilter.ALL      -> categoryResults
+                StockFilter.IN_STOCK -> categoryResults.filter { it.quantity > 0 }
+                StockFilter.FINISHED -> categoryResults.filter { it.quantity == 0 }
+            }
         }
         .stateIn(
             scope = viewModelScope,
@@ -150,20 +164,24 @@ class InventoryViewModel @Inject constructor(
 
     val categoryStats: StateFlow<List<CategoryStat>> =
         allMaterials.combine(availableCategories) { materials, categories ->
-            val totalUnits = materials.sumOf { it.quantity }
-            if (totalUnits == 0) {
+            if (materials.isEmpty()) {
                 emptyList()
             } else {
+                // Only count in-stock units for the breakdown — finished items are excluded.
+                val inStockMaterials = materials.filter { it.quantity > 0 }
+                val totalUnits = inStockMaterials.sumOf { it.quantity }
                 categories
                     .map { category ->
-                        val categoryMaterials = materials.filter { it.category == category }
+                        val categoryMaterials = inStockMaterials.filter { it.category == category }
                         val units = categoryMaterials.sumOf { it.quantity }
                         // Use the shared unit name if every item in this category has the
                         // same unit string; otherwise fall back to the generic "units".
                         val distinctUnits = categoryMaterials.map { it.unit.trim().lowercase() }.toSet()
                         val unitLabel = if (distinctUnits.size == 1) categoryMaterials.first().unit.trim() else "units"
-                        CategoryStat(category, units, (units.toFloat() / totalUnits) * 100f, unitLabel)
+                        val pct = if (totalUnits > 0) (units.toFloat() / totalUnits) * 100f else 0f
+                        CategoryStat(category, units, pct, unitLabel)
                     }
+                    // Only show categories that have at least one in-stock item.
                     .filter { it.units > 0 }
                     .sortedByDescending { it.units }
             }
@@ -218,6 +236,8 @@ class InventoryViewModel @Inject constructor(
     fun updateSearchQuery(query: String) { _searchQuery.value = query }
 
     fun selectCategory(category: String) { _selectedCategory.value = category }
+
+    fun selectStockFilter(filter: StockFilter) { _selectedStockFilter.value = filter }
 
     fun clearError() { _errorMessage.value = null }
 
