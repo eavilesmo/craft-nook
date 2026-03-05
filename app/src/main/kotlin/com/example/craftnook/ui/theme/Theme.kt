@@ -9,9 +9,6 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 
-/**
- * Light mode color scheme for Craft Nook.
- */
 private val LightColorScheme = lightColorScheme(
     primary = PrimaryLight,
     onPrimary = OnPrimaryLight,
@@ -39,9 +36,6 @@ private val LightColorScheme = lightColorScheme(
     outlineVariant = OutlineVariantLight,
 )
 
-/**
- * Dark mode color scheme for Craft Nook.
- */
 private val DarkColorScheme = darkColorScheme(
     primary = PrimaryDark,
     onPrimary = OnPrimaryDark,
@@ -69,14 +63,6 @@ private val DarkColorScheme = darkColorScheme(
     outlineVariant = OutlineVariantDark,
 )
 
-/**
- * Composable function that applies the Craft Nook Material 3 theme.
- * Supports dynamic color schemes on Android 12+ and manual theme selection on earlier versions.
- *
- * @param darkTheme Boolean indicating if dark mode should be used. Defaults to false (light theme).
- * @param dynamicColor Boolean indicating if dynamic colors should be used on supported devices.
- * @param content The composable content to apply the theme to.
- */
 @Composable
 fun CraftNookTheme(
     darkTheme: Boolean = false,

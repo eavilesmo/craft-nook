@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -39,26 +38,14 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-/**
- * Dialog shown when the user taps the Settings (gear) icon on the Inventory screen.
- * Provides two sections:
- *  - Export: save a full JSON backup to a file chosen by the user via SAF.
- *  - Import: pick a JSON backup file to restore materials and journal entries.
- *
- * No runtime permissions are needed on API 29+ because the Storage Access
- * Framework grants per-URI access automatically. On API 26–28 the
- * WRITE_EXTERNAL_STORAGE permission declared in the manifest is sufficient.
- */
 @Composable
 fun BackupRestoreDialog(
     viewModel: InventoryViewModel,
     onDismiss: () -> Unit
 ) {
-    // ── File name: craft_nook_backup_YYYYMMDD_HHmmss.json ──────────────────
     val timestamp  = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
     val exportName = "craft_nook_backup_$timestamp.json"
 
-    // ── Export launcher (ACTION_CREATE_DOCUMENT) ────────────────────────────
     val exportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/json")
     ) { uri ->
@@ -68,7 +55,6 @@ fun BackupRestoreDialog(
         }
     }
 
-    // ── Import launcher (ACTION_OPEN_DOCUMENT) ──────────────────────────────
     val importLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
@@ -125,8 +111,6 @@ fun BackupRestoreDialog(
         }
     )
 }
-
-// ── Private helper composable ────────────────────────────────────────────────
 
 @Composable
 private fun BackupSection(

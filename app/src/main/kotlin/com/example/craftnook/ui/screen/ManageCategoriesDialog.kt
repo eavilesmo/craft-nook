@@ -39,18 +39,6 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 
-/**
- * A dialog that lets the user add new categories or delete existing ones.
- *
- * The list is scrollable with a capped height so it never takes over the screen.
- * Duplicate-name rejection is handled silently in the repository layer
- * (IGNORE on conflict).
- *
- * @param categories   Current sorted list of category names from the DB.
- * @param onAddCategory    Called with the trimmed name when the user taps Add.
- * @param onDeleteCategory Called with the name to delete.
- * @param onDismiss    Close the dialog.
- */
 @Composable
 fun ManageCategoriesDialog(
     categories: List<String>,
@@ -60,7 +48,6 @@ fun ManageCategoriesDialog(
 ) {
     var newCategoryName by remember { mutableStateOf("") }
 
-    // A name is valid if non-blank and not already in the list (case-insensitive)
     val isAddEnabled = newCategoryName.isNotBlank() &&
         categories.none { it.equals(newCategoryName.trim(), ignoreCase = true) }
 
@@ -86,7 +73,6 @@ fun ManageCategoriesDialog(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // ── Add new category ──────────────────────────────────────
                 Text(
                     text = "New category",
                     style = MaterialTheme.typography.labelMedium,
@@ -125,7 +111,6 @@ fun ManageCategoriesDialog(
 
                 Divider()
 
-                // ── Existing categories list (scrollable, max height) ─────
                 Text(
                     text = "Existing categories (${categories.size})",
                     style = MaterialTheme.typography.labelMedium,
@@ -143,7 +128,6 @@ fun ManageCategoriesDialog(
                     LazyColumn(
                         modifier = Modifier
                             .fillMaxWidth()
-                            // Cap height so the dialog never fills the screen
                             .heightIn(max = 260.dp),
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {

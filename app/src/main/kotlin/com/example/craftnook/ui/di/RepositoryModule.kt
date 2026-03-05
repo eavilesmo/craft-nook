@@ -19,9 +19,6 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
-/**
- * Hilt module for repository dependency injection.
- */
 @Module
 @InstallIn(SingletonComponent::class)
 class RepositoryModule {

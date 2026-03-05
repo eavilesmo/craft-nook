@@ -8,10 +8,6 @@ import androidx.compose.material.icons.filled.Note
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.ui.graphics.vector.ImageVector
 
-/**
- * Maps category names to their representative Material icon.
- * Shared between InventoryScreen and StatsScreen.
- */
 internal fun getCategoryIcon(category: String): ImageVector = when (category) {
     "Paint"                    -> Icons.Filled.Palette
     "Brushes"                  -> Icons.Filled.Brush

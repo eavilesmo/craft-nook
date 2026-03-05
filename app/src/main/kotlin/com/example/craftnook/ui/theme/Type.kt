@@ -8,7 +8,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import com.example.craftnook.R
 
-// Comfortaa — friendly, rounded Google Font
 private val ComfortaaFamily = FontFamily(
     Font(R.font.comfortaa_light,    weight = FontWeight.Light),
     Font(R.font.comfortaa_regular,  weight = FontWeight.Normal),

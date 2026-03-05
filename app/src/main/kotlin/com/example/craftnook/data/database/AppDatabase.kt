@@ -4,14 +4,6 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 import com.example.craftnook.data.repository.ArtMaterial
 
-/**
- * Room Database for Craft Nook application.
- *
- * Version history:
- *  1 → 2  Added [ArtMaterial.photoUri] column (migration in DatabaseModule).
- *  2 → 3  Added [UsageLog] table (migration in DatabaseModule).
- *  3 → 4  Added [Category] table; seeded with the 20 default categories.
- */
 @Database(
     entities = [ArtMaterial::class, UsageLog::class, Category::class],
     version = 4,

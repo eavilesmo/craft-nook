@@ -15,29 +15,21 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
-/**
- * Hilt module for database dependency injection.
- *
- * Provides singleton instances of the Room database and DAOs.
- * The database is created once and reused throughout the application lifetime.
- */
 @Module
 @InstallIn(SingletonComponent::class)
 class DatabaseModule {
 
-    /** v1 → v2: adds nullable photoUri column to art_materials. */
     private val MIGRATION_1_2 = object : Migration(1, 2) {
-        override fun migrate(database: SupportSQLiteDatabase) {
-            database.execSQL(
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
                 "ALTER TABLE art_materials ADD COLUMN photoUri TEXT DEFAULT NULL"
             )
         }
     }
 
-    /** v2 → v3: creates the usage_logs table. */
     private val MIGRATION_2_3 = object : Migration(2, 3) {
-        override fun migrate(database: SupportSQLiteDatabase) {
-            database.execSQL(
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
                 """
                 CREATE TABLE IF NOT EXISTS usage_logs (
                     id TEXT NOT NULL PRIMARY KEY,
@@ -54,13 +46,9 @@ class DatabaseModule {
         }
     }
 
-    /**
-     * v3 → v4: creates the categories table and pre-seeds it with the 20
-     * original hardcoded categories so existing users keep their full list.
-     */
     private val MIGRATION_3_4 = object : Migration(3, 4) {
-        override fun migrate(database: SupportSQLiteDatabase) {
-            database.execSQL(
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
                 """
                 CREATE TABLE IF NOT EXISTS categories (
                     name TEXT NOT NULL PRIMARY KEY,
@@ -68,7 +56,6 @@ class DatabaseModule {
                 )
                 """.trimIndent()
             )
-            // Seed the default categories (alphabetical order matches the DAO query)
             val defaults = listOf(
                 "A4 Notebooks", "A5 Notebooks", "Alcohol Markers", "Brushes",
                 "Colored Pencils", "Crayons", "Drawing Pencils", "Erasers",
@@ -78,7 +65,7 @@ class DatabaseModule {
                 "Water-based Markers", "White Pens"
             )
             defaults.forEach { name ->
-                database.execSQL(
+                db.execSQL(
                     "INSERT OR IGNORE INTO categories (name, isDefault) VALUES (?, 1)",
                     arrayOf(name)
                 )

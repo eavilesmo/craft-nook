@@ -2,7 +2,6 @@ package com.example.craftnook.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Pastel / Animal Crossing inspired palette
 val BackgroundLight = Color(0xFFFFF8F0) // Warm off-white / vanilla
 val OnBackgroundLight = Color(0xFF5D4037) // Soft cocoa for readable text
 

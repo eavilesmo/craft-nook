@@ -37,13 +37,10 @@ import com.example.craftnook.ui.theme.PrimaryContainerLight
 import com.example.craftnook.ui.theme.PrimaryLight
 import com.example.craftnook.ui.viewmodel.InventoryViewModel
 
-// Beige/off-white tint for the selected icon — contrasts clearly against the green bubble
 private val SelectedIconTint = Color(0xFFFFF8F0)
 
-// Solid green indicator bubble (full opacity)
 private val IndicatorColor = PrimaryLight
 
-/** All navigation routes in the Craft Nook application. */
 sealed class CraftNookRoute(
     val route: String,
     val label: String,
@@ -76,10 +73,6 @@ private val bottomNavItems = listOf(
     CraftNookRoute.Journal
 )
 
-/**
- * Main navigation graph with a three-tab bottom navigation bar:
- * Inventory · Stats · Usage Journal.
- */
 @Composable
 fun AppNavigation(
     navController: NavHostController = rememberNavController(),
@@ -95,7 +88,6 @@ fun AppNavigation(
                     val selected =
                         currentDestination?.hierarchy?.any { it.route == item.route } == true
 
-                    // Bounce/pop: spring from 0.75 → 1.0 when selected
                     val scale by animateFloatAsState(
                         targetValue = if (selected) 1f else 0.75f,
                         animationSpec = spring(
@@ -125,12 +117,10 @@ fun AppNavigation(
                         },
                         label  = { Text(item.label) },
                         colors = NavigationBarItemDefaults.colors(
-                            // Beige/off-white icon inside the green bubble
                             selectedIconColor   = SelectedIconTint,
                             selectedTextColor   = PrimaryLight,
                             unselectedIconColor = OnBackgroundLight.copy(alpha = 0.55f),
                             unselectedTextColor = OnBackgroundLight.copy(alpha = 0.55f),
-                            // Full-opacity green bubble
                             indicatorColor      = IndicatorColor
                         )
                     )

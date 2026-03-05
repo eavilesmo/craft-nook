@@ -9,10 +9,10 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -25,7 +25,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -34,31 +33,22 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items as gridItems
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.Eco
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Highlight
-import androidx.compose.material.icons.filled.Note
-import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.SaveAlt
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -84,7 +74,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -95,51 +84,23 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.res.painterResource
-import androidx.compose.foundation.Image
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
-import androidx.compose.ui.platform.LocalContext
 import coil.transform.RoundedCornersTransformation
 import com.example.craftnook.R
 import com.example.craftnook.data.repository.ArtMaterial
-import com.example.craftnook.ui.theme.CategoryA4NotebooksColor
-import com.example.craftnook.ui.theme.CategoryA5NotebooksColor
-import com.example.craftnook.ui.theme.CategoryAlcoholMarkersColor
-import com.example.craftnook.ui.theme.CategoryBrushesColor
-import com.example.craftnook.ui.theme.CategoryColoredPencilsColor
-import com.example.craftnook.ui.theme.CategoryCrayonsColor
-import com.example.craftnook.ui.theme.CategoryDrawingPencilsColor
-import com.example.craftnook.ui.theme.CategoryErasersColor
-import com.example.craftnook.ui.theme.CategoryFinelinersColor
-import com.example.craftnook.ui.theme.CategoryFountainPenCartridgesColor
-import com.example.craftnook.ui.theme.CategoryGlitterPensColor
-import com.example.craftnook.ui.theme.CategoryHighlightersColor
-import com.example.craftnook.ui.theme.CategoryMechanicalPencilLeadsColor
-import com.example.craftnook.ui.theme.CategoryMechanicalPencilsColor
-import com.example.craftnook.ui.theme.CategoryMetallicPensColor
-import com.example.craftnook.ui.theme.CategoryPaintColor
-import com.example.craftnook.ui.theme.CategoryPaperColor
-import com.example.craftnook.ui.theme.CategoryPensColor
-import com.example.craftnook.ui.theme.CategoryWaterbasedMarkersColor
-import com.example.craftnook.ui.theme.CategoryWhitePensColor
-import com.example.craftnook.ui.theme.OutlineLight
 import com.example.craftnook.ui.viewmodel.BackupResult
 import com.example.craftnook.ui.viewmodel.InventoryViewModel
 import com.example.craftnook.ui.viewmodel.StockFilter
-import kotlinx.coroutines.launch
+import androidx.compose.foundation.lazy.grid.items as gridItems
 
-/**
- * Main Inventory Screen
- * Displays a list of art materials with their details and stock status
- * Includes search and category filtering
- * Materials are clickable to view details
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun InventoryScreen(
@@ -160,7 +121,6 @@ fun InventoryScreen(
 
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // Show a snackbar whenever a backup result arrives
     LaunchedEffect(backupResult) {
         val result = backupResult ?: return@LaunchedEffect
         val message = when (result) {
@@ -173,13 +133,8 @@ fun InventoryScreen(
         viewModel.clearBackupResult()
     }
 
-    // Material details bottom sheet state
     var selectedMaterial by remember { mutableStateOf<ArtMaterial?>(null) }
 
-    // ── Photo picker state ────────────────────────────────────────────────
-    // Pending URI is written by the picker launcher and consumed by whichever
-    // dialog is currently open. Using separate callbacks avoids cross-dialog
-    // state leakage.
     var pendingAddPhotoUri by remember { mutableStateOf<String?>(null) }
     var pendingEditPhotoUri by remember { mutableStateOf<String?>(null) }
 
@@ -193,7 +148,6 @@ fun InventoryScreen(
     Scaffold(
         topBar = {
             InventoryTopAppBar(
-                totalItems = materials.size,
                 onManageCategories = { showManageCategoriesDialog = true },
                 onBackupRestore    = { showBackupDialog = true }
             )
@@ -224,7 +178,6 @@ fun InventoryScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Search bar
             SearchBar(
                 query = searchQuery,
                 onQueryChange = { viewModel.updateSearchQuery(it) },
@@ -233,7 +186,6 @@ fun InventoryScreen(
                     .padding(horizontal = 20.dp, vertical = 12.dp)
             )
 
-            // Dropdown filter row (category + stock status)
             FilterDropdownBar(
                 categories = availableCategories,
                 selectedCategory = selectedCategory,
@@ -245,7 +197,6 @@ fun InventoryScreen(
                     .padding(horizontal = 16.dp, vertical = 6.dp)
             )
 
-            // Materials list
             if (filteredMaterials.isEmpty()) {
                 if (materials.isEmpty()) {
                     EmptyInventoryState(modifier = Modifier.weight(1f))
@@ -272,7 +223,6 @@ fun InventoryScreen(
         }
     }
 
-    // Material details dialog (AlertDialog instead of bottom sheet)
     if (selectedMaterial != null) {
         MaterialDetailsDialog(
             material = selectedMaterial!!,
@@ -305,7 +255,6 @@ fun InventoryScreen(
         )
     }
 
-    // Manage Categories dialog
     if (showManageCategoriesDialog) {
         ManageCategoriesDialog(
             categories     = availableCategories,
@@ -315,7 +264,6 @@ fun InventoryScreen(
         )
     }
 
-    // Backup & Restore dialog
     if (showBackupDialog) {
         BackupRestoreDialog(
             viewModel = viewModel,
@@ -324,10 +272,6 @@ fun InventoryScreen(
     }
 }
 
-/**
- * Search Bar
- * Material 3 TextField for real-time search filtering
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SearchBar(
@@ -351,10 +295,6 @@ private fun SearchBar(
     )
 }
 
-/**
- * Filter bar — two equal-width dropdown menus side by side.
- * Left: Category selector.  Right: Stock-status selector.
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun FilterDropdownBar(
@@ -365,11 +305,10 @@ private fun FilterDropdownBar(
     onStockFilterSelected: (StockFilter) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Anchor styling constants
-    val anchorBg     = Color(0xFFFFF3E0) // warm beige — one step richer than BackgroundLight
-    val anchorBorder = Color(0xFFD7CCC8) // OutlineVariantLight
+    val anchorBg     = Color(0xFFFFF3E0)
+    val anchorBorder = Color(0xFFD7CCC8)
     val anchorShape  = RoundedCornerShape(14.dp)
-    val labelColor   = Color(0xFF5D4037) // OnBackgroundLight
+    val labelColor   = Color(0xFF5D4037)
 
     val stockOptions = listOf(
         StockFilter.ALL      to "All",
@@ -382,7 +321,6 @@ private fun FilterDropdownBar(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        // ── Left: Category dropdown ──────────────────────────────────────
         NookDropdown(
             label = if (selectedCategory == "All") "Category" else selectedCategory,
             anchorBg = anchorBg,
@@ -410,7 +348,6 @@ private fun FilterDropdownBar(
             }
         }
 
-        // ── Right: Stock-status dropdown ─────────────────────────────────
         NookDropdown(
             label = stockLabel,
             anchorBg = anchorBg,
@@ -439,10 +376,6 @@ private fun FilterDropdownBar(
     }
 }
 
-/**
- * Reusable Nook-styled dropdown anchor + menu.
- * [content] receives a `closeMenu` lambda so item click handlers can close the menu.
- */
 @Composable
 private fun NookDropdown(
     label: String,
@@ -456,7 +389,6 @@ private fun NookDropdown(
     var expanded by remember { mutableStateOf(false) }
 
     Box(modifier = modifier) {
-        // Anchor
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -500,14 +432,9 @@ private fun NookDropdown(
     }
 }
 
-/**
- * Top app bar for inventory screen
- * Shows title, total inventory count, and analytics toggle button
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun InventoryTopAppBar(
-    totalItems: Int,
     onManageCategories: () -> Unit,
     onBackupRestore: () -> Unit
 ) {
@@ -576,11 +503,6 @@ private fun InventoryTopAppBar(
     )
 }
 
-/**
- * Materials Grid
- * Displays all materials in a 2-column LazyVerticalGrid with airy spacing
- * Includes staggered fade-in animations for smooth visual feedback
- */
 @Composable
 private fun MaterialsList(
     materials: List<ArtMaterial>,
@@ -633,20 +555,6 @@ private fun MaterialsList(
     }
 }
 
-/**
- * InventoryItemCard — uniform 2-column grid cell.
- *
- * Layout:
- *   ┌──────────────────────────┐
- *   │  Photo  (3:4 ratio, Crop)│  ← AsyncImage or leaf placeholder, centred crop
- *   ├──────────────────────────┤
- *   │ Name (bold)              │  ← solid warm-beige footer
- *   │ [Qty pill]  [Edit][Del]  │    actions revealed only on long-press
- *   └──────────────────────────┘
- *
- * Card corner radius 16dp keeps a clean feel at this density.
- * Finished items: full-card alpha 0.42 + grayscale on image.
- */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun InventoryItemCard(
@@ -669,9 +577,8 @@ private fun InventoryItemCard(
     val context    = LocalContext.current
     val isFinished = material.quantity == 0
 
-    // Footer palette
-    val footerBg       = Color(0xFFEDE0D4)           // warm beige
-    val footerTextMain = Color(0xFF4E342E)            // dark espresso
+    val footerBg       = Color(0xFFEDE0D4)
+    val footerTextMain = Color(0xFF4E342E)
     val pillBg         = Color(0xFFBCAAA4).copy(alpha = 0.40f)
     val pillText       = Color(0xFF4E342E)
 
@@ -698,7 +605,6 @@ private fun InventoryItemCard(
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
 
-            // ── Photo area — fixed 3:4 ratio, centred crop ────────────────
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -736,7 +642,6 @@ private fun InventoryItemCard(
                 }
             }
 
-            // ── Footer ────────────────────────────────────────────────────
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -745,7 +650,6 @@ private fun InventoryItemCard(
                     .animateContentSize(),
                 verticalArrangement = Arrangement.spacedBy(5.dp)
             ) {
-                // Material name — bold, single line
                 Text(
                     text = material.name,
                     style = MaterialTheme.typography.labelMedium,
@@ -755,13 +659,11 @@ private fun InventoryItemCard(
                     overflow = TextOverflow.Ellipsis
                 )
 
-                // Quantity pill + long-press actions
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    // Pill: "44 Markers"
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(50.dp))
@@ -779,7 +681,6 @@ private fun InventoryItemCard(
                         )
                     }
 
-                    // Edit / Delete — always visible
                     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         Surface(
                             modifier = Modifier
@@ -820,7 +721,6 @@ private fun InventoryItemCard(
             }
         }
     }
-    // Edit dialog
     if (showEditDialog) {
         EditMaterialDialog(
             material = material,
@@ -841,7 +741,6 @@ private fun InventoryItemCard(
         )
     }
 
-    // Delete confirmation dialog
     if (showDeleteConfirmation) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirmation = false },
@@ -862,116 +761,7 @@ private fun InventoryItemCard(
     }
 }
 
-/**
- * Category Badge
- * Shows the category of the material in a styled chip with premium pastel colors.
- * In compact mode (used in grid cards) shows only the icon to save space.
- */
-@Composable
-private fun CategoryBadge(
-    category: String,
-    modifier: Modifier = Modifier,
-    compact: Boolean = false
-) {
-    var isHovered by remember { mutableStateOf(false) }
-    
-    // Map categories to premium pastel colors
-    val backgroundColor = when (category) {
-        "Paint" -> CategoryPaintColor
-        "Brushes" -> CategoryBrushesColor
-        "Paper" -> CategoryPaperColor
-        "Pens" -> CategoryPensColor
-        "Alcohol Markers" -> CategoryAlcoholMarkersColor
-        "Water-based Markers" -> CategoryWaterbasedMarkersColor
-        "Colored Pencils" -> CategoryColoredPencilsColor
-        "Drawing Pencils" -> CategoryDrawingPencilsColor
-        "Mechanical Pencil Leads" -> CategoryMechanicalPencilLeadsColor
-        "Mechanical Pencils" -> CategoryMechanicalPencilsColor
-        "White Pens" -> CategoryWhitePensColor
-        "Glitter Pens" -> CategoryGlitterPensColor
-        "Metallic Pens" -> CategoryMetallicPensColor
-        "Crayons" -> CategoryCrayonsColor
-        "Highlighters" -> CategoryHighlightersColor
-        "A4 Notebooks" -> CategoryA4NotebooksColor
-        "A5 Notebooks" -> CategoryA5NotebooksColor
-        "Fountain Pen Cartridges" -> CategoryFountainPenCartridgesColor
-        "Fineliners" -> CategoryFinelinersColor
-        "Erasers" -> CategoryErasersColor
-        else -> CategoryPaintColor
-    }    
-    // Dark text for good contrast on pastels
-    val textColor = Color(0xFF2D3748)
-    val iconTint = Color(0xFF795548) // Warm brown — natural, cozy
 
-    Box(
-        modifier = modifier
-            .background(
-                color = backgroundColor,
-                shape = RoundedCornerShape(18.dp)
-            )
-            .border(1.dp, OutlineLight.copy(alpha = 0.6f), RoundedCornerShape(18.dp))
-            .padding(
-                horizontal = if (compact) 8.dp else 16.dp,
-                vertical = if (compact) 6.dp else 10.dp
-            )
-            .graphicsLayer {
-                scaleX = if (isHovered) 1.05f else 1f
-                scaleY = if (isHovered) 1.05f else 1f
-            },
-        contentAlignment = Alignment.Center
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Icon(
-                imageVector = getCategoryIcon(category),
-                contentDescription = category,
-                modifier = Modifier.size(if (compact) 13.dp else 14.dp),
-                tint = iconTint
-            )
-            if (!compact) {
-                Text(
-                    text = category,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = textColor,
-                    fontWeight = FontWeight.Medium,
-                    letterSpacing = 0.2.sp
-                )
-            }
-        }
-    }
-}
-
-/**
- * Quantity Info
- * Displays stock quantity with icon
- */
-@Composable
-private fun QuantityInfo(
-    quantity: Int,
-    unit: String,
-    modifier: Modifier = Modifier
-) {
-    Row(
-        modifier = modifier,
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        Text(
-            text = "$quantity $unit",
-            style = MaterialTheme.typography.bodySmall,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-    }
-}
-
-/**
- * Empty Inventory State
- * Displayed when there are no materials in inventory at all.
- * Features fade and scale animation on appearance.
- */
 @Composable
 private fun EmptyInventoryState(
     modifier: Modifier = Modifier
@@ -1024,11 +814,6 @@ private fun EmptyInventoryState(
     }
 }
 
-/**
- * Empty Search/Filter State
- * Displayed when a search query or category filter returns no results.
- * Features fade and scale animation on appearance.
- */
 @Composable
 private fun EmptySearchState(
     modifier: Modifier = Modifier
@@ -1081,13 +866,6 @@ private fun EmptySearchState(
     }
 }
 
-/**
- * Add Material Dialog
- * Material 3 dialog for adding new materials to the inventory
- * Includes validation for Name and Quantity fields
- * Allows category selection from fixed dropdown
- * Allows gallery photo selection via system photo picker
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AddMaterialDialog(
@@ -1105,7 +883,6 @@ private fun AddMaterialDialog(
     var unit by remember { mutableStateOf("unit") }
     val context = LocalContext.current
 
-    // Validation: name and quantity must be non-empty, category must be selected
     val isValid = name.isNotBlank() && quantity.isNotBlank() && quantity.toIntOrNull() != null && quantity.toIntOrNull()!! > 0
 
     AlertDialog(
@@ -1123,7 +900,6 @@ private fun AddMaterialDialog(
                     .fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // ── Add Photo button ──────────────────────────────────────
                 OutlinedButton(
                     onClick = onPickPhoto,
                     modifier = Modifier.fillMaxWidth(),
@@ -1141,7 +917,6 @@ private fun AddMaterialDialog(
                     )
                 }
 
-                // Thumbnail preview if a photo was picked
                 if (!photoUri.isNullOrBlank()) {
                     AsyncImage(
                         model = ImageRequest.Builder(context)
@@ -1158,7 +933,6 @@ private fun AddMaterialDialog(
                     )
                 }
 
-                // Name field
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
@@ -1168,7 +942,6 @@ private fun AddMaterialDialog(
                     placeholder = { Text("e.g., Acrylic Paint") }
                 )
 
-                // Brand field
                 OutlinedTextField(
                     value = brand,
                     onValueChange = { brand = it },
@@ -1178,7 +951,6 @@ private fun AddMaterialDialog(
                     placeholder = { Text("e.g., Faber-Castell") }
                 )
 
-                // Category dropdown
                 Box(modifier = Modifier.fillMaxWidth()) {
                     OutlinedTextField(
                         value = selectedCategory,
@@ -1219,7 +991,6 @@ private fun AddMaterialDialog(
                     }
                 }
 
-                // Quantity field
                 OutlinedTextField(
                     value = quantity,
                     onValueChange = { quantity = it },
@@ -1229,7 +1000,6 @@ private fun AddMaterialDialog(
                     placeholder = { Text("e.g., 10") }
                 )
 
-                // Unit field
                 OutlinedTextField(
                     value = unit,
                     onValueChange = { unit = it },
@@ -1262,12 +1032,7 @@ private fun AddMaterialDialog(
     )
 }
 
-/**
- * Edit Material Dialog
- * Material 3 dialog for editing existing materials in the inventory
- * Uses a numeric stepper for quantity and proper dropdowns for category/unit
- * Allows gallery photo selection via system photo picker
- */
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun EditMaterialDialog(
@@ -1286,7 +1051,6 @@ private fun EditMaterialDialog(
     var categoryDropdownExpanded by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
-    // photoUri from the parent (picker result) takes priority over the stored one
     val displayPhotoUri = photoUri ?: material.photoUri
 
     val isValid = name.isNotBlank()
@@ -1302,7 +1066,6 @@ private fun EditMaterialDialog(
                     .fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // ── Add / Change Photo button ─────────────────────────────
                 OutlinedButton(
                     onClick = onPickPhoto,
                     modifier = Modifier.fillMaxWidth(),
@@ -1320,7 +1083,6 @@ private fun EditMaterialDialog(
                     )
                 }
 
-                // Thumbnail preview
                 if (!displayPhotoUri.isNullOrBlank()) {
                     AsyncImage(
                         model = ImageRequest.Builder(context)
@@ -1353,7 +1115,6 @@ private fun EditMaterialDialog(
                     singleLine = true
                 )
 
-                // Category dropdown
                 Box(modifier = Modifier.fillMaxWidth()) {
                     OutlinedTextField(
                         value = category,
@@ -1394,7 +1155,6 @@ private fun EditMaterialDialog(
                     }
                 }
 
-                // Quantity Stepper
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -1413,7 +1173,6 @@ private fun EditMaterialDialog(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        // Minus button
                         IconButton(
                             onClick = { quantity = (quantity - 1).coerceAtLeast(0) },
                             modifier = Modifier
@@ -1428,7 +1187,6 @@ private fun EditMaterialDialog(
                             )
                         }
 
-                        // Quantity display
                         Text(
                             text = quantity.toString(),
                             style = MaterialTheme.typography.headlineSmall,
@@ -1438,7 +1196,6 @@ private fun EditMaterialDialog(
                             color = MaterialTheme.colorScheme.onSurface
                         )
 
-                        // Plus button
                         IconButton(
                             onClick = { quantity += 1 },
                             modifier = Modifier
@@ -1497,10 +1254,6 @@ private fun EditMaterialDialog(
     )
 }
 
-/**
- * Material Details Dialog
- * Displays material information in a popup dialog instead of a bottom sheet
- */
 @Composable
 private fun MaterialDetailsDialog(
     material: ArtMaterial,
@@ -1520,7 +1273,6 @@ private fun MaterialDetailsDialog(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                // Description
                 if (material.description.isNotBlank()) {
                     Column(
                         verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -1539,7 +1291,6 @@ private fun MaterialDetailsDialog(
                     }
                 }
 
-                // Current Stock
                 Column(
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
@@ -1566,7 +1317,6 @@ private fun MaterialDetailsDialog(
                     }
                 }
 
-                // Category
                 Column(
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
@@ -1583,7 +1333,6 @@ private fun MaterialDetailsDialog(
                     )
                 }
 
-                // Unit
                 Column(
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {

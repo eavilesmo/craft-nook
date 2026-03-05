@@ -37,15 +37,6 @@ import com.example.craftnook.ui.viewmodel.InventoryViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.delay
 
-/**
- * Main activity for the Craft Nook application.
- *
- * Serves as the entry point for the app and hosts the navigation graph.
- * The activity uses Jetpack Compose for UI and is configured for Hilt dependency injection.
- *
- * ViewModels are automatically injected via Hilt and the AppNavigation composable
- * manages navigation between different screens.
- */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -62,38 +53,26 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-/**
- * Manages the app entry experience:
- *  1. A splash screen (Leaf logo + app name) fades in over 600 ms, holds for 800 ms,
- *     then fades out over 400 ms.
- *  2. The main navigation content fades in over 500 ms as the splash exits.
- */
 @Composable
 private fun AppEntryAnimation(viewModel: InventoryViewModel) {
-    // Track whether the splash is still showing
     var splashVisible by remember { mutableStateOf(true) }
 
     val splashAlpha = remember { Animatable(0f) }
     val contentAlpha = remember { Animatable(0f) }
 
     LaunchedEffect(Unit) {
-        // Fade splash in
         splashAlpha.animateTo(1f, animationSpec = tween(durationMillis = 600))
-        // Hold
         delay(800)
-        // Fade splash out while fading content in simultaneously
         splashAlpha.animateTo(0f, animationSpec = tween(durationMillis = 400))
         splashVisible = false
         contentAlpha.animateTo(1f, animationSpec = tween(durationMillis = 500))
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // Main content — always composed, alpha controls visibility
         Box(modifier = Modifier.alpha(contentAlpha.value)) {
             AppNavigation(viewModel = viewModel)
         }
 
-        // Splash overlay — sits on top until dismissed
         if (splashVisible) {
             SplashOverlay(alpha = splashAlpha.value)
         }

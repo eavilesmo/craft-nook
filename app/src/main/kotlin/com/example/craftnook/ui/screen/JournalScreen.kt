@@ -79,8 +79,6 @@ import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.launch
 
-// ── Colour + icon helpers ────────────────────────────────────────────────────
-
 private data class EventStyle(
     val color: Color,
     val icon: ImageVector,
@@ -93,19 +91,13 @@ private fun eventStyle(eventType: String): EventStyle = when (eventType) {
     else            -> EventStyle(Color.Gray,     Icons.Filled.BookmarkAdded, eventType)
 }
 
-// ── Date formatters ──────────────────────────────────────────────────────────
-
 private val monthFormatter  = SimpleDateFormat("MMMM yyyy", Locale.getDefault())
 private val entryFormatter  = SimpleDateFormat("MMM d, HH:mm", Locale.getDefault())
 
 private fun Long.toMonthKey(): String   = monthFormatter.format(Date(this))
 private fun Long.toEntryDate(): String  = entryFormatter.format(Date(this))
 
-// Wood-brown colour used for the per-entry delete icon.
-// Matches the app's OnBackgroundLight cocoa tone but slightly lighter/muted.
 private val WoodBrown = Color(0xFF8D6E63)
-
-// ── Screen ───────────────────────────────────────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -116,12 +108,9 @@ fun JournalScreen(viewModel: InventoryViewModel) {
     val snackbarHostState = remember { SnackbarHostState() }
     val scope             = rememberCoroutineScope()
 
-    // Group by month, preserving newest-first order
     val byMonth: Map<String, List<UsageLog>> = allLogs
         .groupBy { it.timestamp.toMonthKey() }
 
-    // Collect single-entry deletions and show an Undo snackbar.
-    // Re-inserting via undoDeleteJournalEntry does not touch inventory quantities.
     LaunchedEffect(Unit) {
         viewModel.deletedLogEntry.collect { deleted ->
             scope.launch {
@@ -137,7 +126,6 @@ fun JournalScreen(viewModel: InventoryViewModel) {
         }
     }
 
-    // ── Clear history confirmation dialog ────────────────────────────────────
     if (showClearDialog) {
         AlertDialog(
             onDismissRequest = { showClearDialog = false },
@@ -254,8 +242,6 @@ fun JournalScreen(viewModel: InventoryViewModel) {
     }
 }
 
-// ── Summary badge colours ────────────────────────────────────────────────────
-
 private val SummaryGreenText = Color(0xFF2E7D32)
 private val SummaryGreenBg   = Color(0xFFE8F5E9)
 private val SummaryRedText   = Color(0xFFC62828)
@@ -286,8 +272,6 @@ private fun SummaryBadge(count: Int, label: String, textColor: Color, bgColor: C
     }
 }
 
-// ── Month section (collapsible) ──────────────────────────────────────────────
-
 @Composable
 private fun MonthSection(
     month:    String,
@@ -302,7 +286,6 @@ private fun MonthSection(
     val hasSummary = added > 0 || used > 0
 
     Column {
-        // Month header row
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -325,10 +308,8 @@ private fun MonthSection(
                         verticalAlignment    = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(5.dp)
                     ) {
-                        // Green group: added
                         if (added > 0) SummaryBadge(added, "added", SummaryGreenText, SummaryGreenBg)
 
-                        // Pipe separator
                         if (added > 0 && used > 0) {
                             Text(
                                 text  = "|",
@@ -338,7 +319,6 @@ private fun MonthSection(
                             )
                         }
 
-                        // Red group: used
                         if (used > 0) SummaryBadge(used, "used", SummaryRedText, SummaryRedBg)
                     }
                 }
@@ -359,7 +339,6 @@ private fun MonthSection(
             }
         }
 
-        // Entry cards, animated
         AnimatedVisibility(
             visible = expanded,
             enter   = expandVertically() + fadeIn(),
@@ -379,14 +358,12 @@ private fun MonthSection(
     }
 }
 
-// ── Individual log entry card ────────────────────────────────────────────────
-
 @Composable
 private fun LogEntryCard(log: UsageLog, onDelete: () -> Unit) {
     val style = eventStyle(log.eventType)
     val deltaStr = when {
         log.quantityDelta > 0 -> "+${log.quantityDelta}"
-        else                  -> "${log.quantityDelta}"   // already negative
+        else                  -> "${log.quantityDelta}"
     }
 
     Card(
@@ -401,7 +378,6 @@ private fun LogEntryCard(log: UsageLog, onDelete: () -> Unit) {
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Colour dot with event icon
             Box(
                 modifier         = Modifier
                     .size(40.dp)
@@ -419,7 +395,6 @@ private fun LogEntryCard(log: UsageLog, onDelete: () -> Unit) {
 
             Spacer(Modifier.width(12.dp))
 
-            // Material name + category + event label
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
@@ -458,7 +433,6 @@ private fun LogEntryCard(log: UsageLog, onDelete: () -> Unit) {
 
             Spacer(Modifier.width(4.dp))
 
-            // Delta badge
             Box(
                 modifier         = Modifier
                     .clip(RoundedCornerShape(10.dp))
@@ -476,7 +450,6 @@ private fun LogEntryCard(log: UsageLog, onDelete: () -> Unit) {
                 )
             }
 
-            // Delete icon — subtle wood-brown trash can
             IconButton(
                 onClick  = onDelete,
                 modifier = Modifier.size(36.dp)
@@ -492,7 +465,6 @@ private fun LogEntryCard(log: UsageLog, onDelete: () -> Unit) {
     }
 }
 
-// ── Empty state ──────────────────────────────────────────────────────────────
 
 @Composable
 private fun EmptyJournalState() {

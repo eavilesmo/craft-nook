@@ -68,8 +68,6 @@ import com.example.craftnook.ui.theme.PrimaryLight
 import com.example.craftnook.ui.viewmodel.CategoryStat
 import com.example.craftnook.ui.viewmodel.InventoryViewModel
 
-// ── Colour helpers ──────────────────────────────────────────────────────────
-
 private fun getCategoryBarColor(category: String): Color = when (category) {
     "Paint"                    -> CategoryPaintColor
     "Brushes"                  -> CategoryBrushesColor
@@ -101,8 +99,6 @@ private fun Color.darken(factor: Float = 0.25f): Color {
     val b = ((argb        and 0xFF) * (1f - factor)).toInt().coerceIn(0, 255)
     return Color(r, g, b)
 }
-
-// ── Screen ──────────────────────────────────────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -153,8 +149,6 @@ fun StatsScreen(viewModel: InventoryViewModel) {
         }
     }
 }
-
-// ── Summary row ─────────────────────────────────────────────────────────────
 
 @Composable
 private fun SummaryRow(
@@ -237,8 +231,6 @@ private fun SummaryCard(
     }
 }
 
-// ── Breakdown card ──────────────────────────────────────────────────────────
-
 @Composable
 private fun BreakdownCard(stats: List<CategoryStat>) {
     Card(
@@ -265,8 +257,6 @@ private fun BreakdownCard(stats: List<CategoryStat>) {
     }
 }
 
-// Fixed widths for the right-hand stat columns so they stay perfectly aligned
-// regardless of the content in each row.
 private val UNIT_COUNT_WIDTH = 96.dp
 private val PERCENTAGE_WIDTH = 40.dp
 
@@ -277,12 +267,10 @@ private fun BreakdownRow(stat: CategoryStat) {
 
     Column(modifier = Modifier.fillMaxWidth()) {
 
-        // ── Top line: icon + name | unit count | percentage ─────────────
         Row(
             modifier          = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Coloured icon badge
             Box(
                 modifier = Modifier
                     .size(32.dp)
@@ -300,7 +288,6 @@ private fun BreakdownRow(stat: CategoryStat) {
 
             Spacer(Modifier.width(10.dp))
 
-            // Category name — takes all remaining space
             Text(
                 text     = stat.category,
                 style    = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
@@ -312,7 +299,6 @@ private fun BreakdownRow(stat: CategoryStat) {
 
             Spacer(Modifier.width(8.dp))
 
-            // Unit count — fixed width, right-aligned
             Text(
                 text      = "${stat.units} ${stat.unitLabel}",
                 style     = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
@@ -324,7 +310,6 @@ private fun BreakdownRow(stat: CategoryStat) {
 
             Spacer(Modifier.width(8.dp))
 
-            // Percentage — fixed width, right-aligned
             Text(
                 text      = "${stat.percentage.toInt()}%",
                 style     = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
@@ -336,7 +321,6 @@ private fun BreakdownRow(stat: CategoryStat) {
 
         Spacer(Modifier.height(10.dp))
 
-        // ── Progress bar — thick, fully pill-shaped ─────────────────────
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -354,8 +338,6 @@ private fun BreakdownRow(stat: CategoryStat) {
         }
     }
 }
-
-// ── Empty state ──────────────────────────────────────────────────────────────
 
 @Composable
 private fun EmptyStatsState() {
