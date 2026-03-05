@@ -5,15 +5,18 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.slideInVertically
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,6 +25,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -591,15 +595,14 @@ private fun MaterialsList(
     LazyVerticalGrid(
         columns = GridCells.Fixed(2),
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 14.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         gridItems(
             items = materials,
             key = { material -> material.id }
         ) { material ->
-            // Staggered fade-in animation for each item
             AnimatedVisibility(
                 visible = true,
                 enter = fadeIn(
@@ -631,18 +634,20 @@ private fun MaterialsList(
 }
 
 /**
- * InventoryItemCard — photo-first grid cell.
+ * InventoryItemCard — uniform 2-column grid cell.
  *
- * Layout (1:1 aspect ratio card):
+ * Layout:
  *   ┌──────────────────────────┐
- *   │  Photo area  80%         │  ← AsyncImage or leaf placeholder
- *   │  [Edit] overlay          │    rounded top corners (24dp)
- *   │             [Delete]     │    action buttons sit on bottom edge of photo
+ *   │  Photo  (3:4 ratio, Crop)│  ← AsyncImage or leaf placeholder, centred crop
  *   ├──────────────────────────┤
- *   │ Name (bold)  │ Category  │  ← 20% info bar
- *   │              │ Qty       │
+ *   │ Name (bold)              │  ← solid warm-beige footer
+ *   │ [Qty pill]  [Edit][Del]  │    actions revealed only on long-press
  *   └──────────────────────────┘
+ *
+ * Card corner radius 16dp keeps a clean feel at this density.
+ * Finished items: full-card alpha 0.42 + grayscale on image.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun InventoryItemCard(
     material: ArtMaterial,
@@ -657,35 +662,47 @@ private fun InventoryItemCard(
 ) {
     var showDeleteConfirmation by remember { mutableStateOf(false) }
     var showEditDialog by remember { mutableStateOf(false) }
+    var actionsVisible by remember { mutableStateOf(false) }
 
-    val cardShape  = RoundedCornerShape(20.dp)
-    val photoShape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
+    val cardShape  = RoundedCornerShape(16.dp)
+    val photoShape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
     val context    = LocalContext.current
     val isFinished = material.quantity == 0
 
+    // Footer palette
+    val footerBg       = Color(0xFFEDE0D4)           // warm beige
+    val footerTextMain = Color(0xFF4E342E)            // dark espresso
+    val pillBg         = Color(0xFFBCAAA4).copy(alpha = 0.40f)
+    val pillText       = Color(0xFF4E342E)
+
     Card(
         modifier = modifier
-            .aspectRatio(1f)
-            .clickable(
-                enabled = true,
-                onClick = onClick,
+            .fillMaxWidth()
+            .alpha(if (isFinished) 0.42f else 1f)
+            .combinedClickable(
                 interactionSource = remember { MutableInteractionSource() },
-                indication = null
+                indication = null,
+                onClick = {
+                    actionsVisible = false
+                    onClick()
+                },
+                onLongClick = { actionsVisible = !actionsVisible }
             ),
         shape = cardShape,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFD7CCC8))
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isFinished) 0.dp else 2.dp),
+        border = androidx.compose.foundation.BorderStroke(
+            width = 1.dp,
+            color = if (isFinished) Color(0xFFD7CCC8).copy(alpha = 0.45f) else Color(0xFFD7CCC8)
+        )
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxWidth()) {
 
-            // ── Photo area (80%) ──────────────────────────────────────────
+            // ── Photo area — fixed 3:4 ratio, centred crop ────────────────
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(0.80f)
+                    .aspectRatio(5f / 4f)
                     .clip(photoShape)
             ) {
                 if (!material.photoUri.isNullOrBlank()) {
@@ -693,17 +710,16 @@ private fun InventoryItemCard(
                         model = ImageRequest.Builder(context)
                             .data(material.photoUri)
                             .crossfade(true)
-                            .transformations(RoundedCornersTransformation(topLeft = 20f, topRight = 20f))
                             .build(),
                         contentDescription = material.name,
                         contentScale = ContentScale.Crop,
+                        alignment = Alignment.Center,
                         colorFilter = if (isFinished)
                             ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(0f) })
                         else null,
                         modifier = Modifier.fillMaxSize()
                     )
                 } else {
-                    // Placeholder — subtle warm background + leaf icon
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -713,122 +729,97 @@ private fun InventoryItemCard(
                         Icon(
                             imageVector = Icons.Filled.Eco,
                             contentDescription = null,
-                            modifier = Modifier.size(36.dp),
+                            modifier = Modifier.size(32.dp),
                             tint = if (isFinished) Color(0xFFBDBDBD) else Color(0xFFBCAAA4)
                         )
                     }
                 }
-
-                // 'Finished!' ribbon — top-right corner when qty == 0
-                if (isFinished) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(top = 6.dp, end = 6.dp)
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(Color(0xFF616161).copy(alpha = 0.82f))
-                            .padding(horizontal = 5.dp, vertical = 2.dp)
-                    ) {
-                        Text(
-                            text       = "Finished!",
-                            color      = Color.White,
-                            fontSize   = 8.sp,
-                            fontWeight = FontWeight.Medium,
-                            maxLines   = 1
-                        )
-                    }
-                }
-
-                // Edit button — bottom-left overlay on photo
-                Surface(
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(6.dp)
-                        .size(28.dp)
-                        .clickable { showEditDialog = true },
-                    shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
-                    tonalElevation = 2.dp
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Filled.Edit,
-                            contentDescription = "Edit material",
-                            modifier = Modifier.size(14.dp),
-                            tint = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                }
-
-                // Delete button — bottom-right overlay on photo
-                Surface(
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(6.dp)
-                        .size(28.dp)
-                        .clickable { showDeleteConfirmation = true },
-                    shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
-                    tonalElevation = 2.dp
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Outlined.Delete,
-                            contentDescription = "Delete material",
-                            modifier = Modifier.size(14.dp),
-                            tint = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                }
             }
 
-            // ── Info bar (20%) ────────────────────────────────────────────
-            Row(
+            // ── Footer ────────────────────────────────────────────────────
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(0.20f)
-                    .background(MaterialTheme.colorScheme.surface)
-                    .padding(horizontal = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                    .background(footerBg)
+                    .padding(horizontal = 10.dp, vertical = 8.dp)
+                    .animateContentSize(),
+                verticalArrangement = Arrangement.spacedBy(5.dp)
             ) {
-                // Left: material name
+                // Material name — bold, single line
                 Text(
                     text = material.name,
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
+                    color = footerTextMain,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
 
-                Spacer(modifier = Modifier.width(6.dp))
-
-                // Right: category icon + quantity stacked
-                Column(
-                    horizontalAlignment = Alignment.End,
-                    verticalArrangement = Arrangement.spacedBy(1.dp)
+                // Quantity pill + long-press actions
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Icon(
-                        imageVector = getCategoryIcon(material.category),
-                        contentDescription = material.category,
-                        modifier = Modifier.size(12.dp),
-                        tint = if (isFinished) Color(0xFFBDBDBD) else Color(0xFF8D6E63)
-                    )
-                    Text(
-                        text = "${material.quantity} ${material.unit}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (isFinished) Color(0xFFBDBDBD) else MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 9.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    // Pill: "44 Markers"
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(50.dp))
+                            .background(pillBg)
+                            .padding(horizontal = 7.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "${material.quantity} ${material.unit}",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Medium,
+                            color = pillText,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            fontSize = 10.sp
+                        )
+                    }
+
+                    // Edit / Delete — always visible
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Surface(
+                            modifier = Modifier
+                                .size(26.dp)
+                                .clickable { showEditDialog = true },
+                            shape = RoundedCornerShape(7.dp),
+                            color = Color(0xFFF3E5D8),
+                            tonalElevation = 0.dp
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Filled.Edit,
+                                    contentDescription = "Edit",
+                                    modifier = Modifier.size(13.dp),
+                                    tint = Color(0xFF5D4037)
+                                )
+                            }
+                        }
+                        Surface(
+                            modifier = Modifier
+                                .size(26.dp)
+                                .clickable { showDeleteConfirmation = true },
+                            shape = RoundedCornerShape(7.dp),
+                            color = Color(0xFFF3E5D8),
+                            tonalElevation = 0.dp
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Delete,
+                                    contentDescription = "Delete",
+                                    modifier = Modifier.size(13.dp),
+                                    tint = Color(0xFFBF360C)
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
     }
-
     // Edit dialog
     if (showEditDialog) {
         EditMaterialDialog(
@@ -838,11 +829,13 @@ private fun InventoryItemCard(
             onPickPhoto = onPickPhoto,
             onDismiss = {
                 showEditDialog = false
+                actionsVisible = false
                 onPhotoUriConsumed()
             },
             onSave = { updatedMaterial ->
                 onEdit(updatedMaterial)
                 showEditDialog = false
+                actionsVisible = false
                 onPhotoUriConsumed()
             }
         )
